@@ -1,31 +1,51 @@
-# Dependencies
+# Dependencies & Package Managers
 node_modules/
+vendor/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Cloudflare Wrangler & Environment
+# Cloudflare Wrangler & Environment Secrets
 .wrangler/
 .dev.vars
 .dev.vars.*
 .env
 .env.*
 .env.backup
+.env.local
+.env.production
+.env.development
+config/secrets*.json
+secrets/
+canarytokens/
 !.dev.vars.example
 !.env.example
 
-# Build & Logs
+# Build Artifacts & Logs
 dist/
+build/
 *.log
+logs/
+*.sqlite
+*.db
 
-# Sensitive Configs
+# Sensitive Configs & Local Uploaders
 *.sxcu
-
-# AI & Editor Tools
-.aider*
-.gemini/
-
-# Migration scripts and local scratch files
+!sharex_config.sxcu.example
 uploader.js
 raw_input.txt
 converted_output.txt
 convert.js
 link_mapping.json
 output_converted.txt
+
+# Editor & OS Artifacts
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+.aider*
+.gemini/
