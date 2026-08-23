@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Cloudflare Wrangler & Environment
+.wrangler/
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+.env.backup
+!.dev.vars.example
+!.env.example
+
+# Build & Logs
+dist/
+*.log
+
+# Sensitive Configs
+*.sxcu
+
+# AI & Editor Tools
+.aider*
+.gemini/
+
+# Migration scripts and local scratch files
+uploader.js
+raw_input.txt
+converted_output.txt
+convert.js
+link_mapping.json
+output_converted.txt
