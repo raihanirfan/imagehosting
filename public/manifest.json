@@ -1,0 +1,18 @@
+{
+  "name": "ImgOF — Ultrafast Image Hosting",
+  "short_name": "ImgOF",
+  "description": "Free, secure, serverless high-performance image hosting powered by Cloudflare and Google Drive.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

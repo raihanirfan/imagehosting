@@ -1,0 +1,15 @@
+# ImgOF
+
+> Free, ultrafast, serverless image hosting and CDN delivery API powered by Cloudflare Workers and Google Drive.
+
+## Documentation
+- [API Documentation](https://imgof.my.id/docs): Complete REST API documentation for upload, delete, and metadata retrieval.
+- [Frequently Asked Questions](https://imgof.my.id/faq): Storage limits, retention policies, and supported image formats.
+- [Terms of Service & Privacy Policy](https://imgof.my.id/legal): User terms, acceptable use policy, and DMCA takedown procedures.
+- [ShareX Configuration](https://imgof.my.id/sharex.sxcu): Downloadable configuration file for ShareX desktop integration.
+
+## API Endpoints
+- [Upload File Endpoint](https://imgof.my.id/api/upload): POST endpoint for binary image file upload via multipart/form-data.
+- [Remote URL Upload Endpoint](https://imgof.my.id/api/upload): POST endpoint for importing remote image URLs via JSON payload.
+- [Image Metadata Endpoint](https://imgof.my.id/api/info): GET endpoint for viewing image stats, mime type, and dimensions.
+- [Delete Image Endpoint](https://imgof.my.id/api/delete): DELETE endpoint for permanently removing images via delete token.

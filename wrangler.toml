@@ -1,0 +1,29 @@
+name = "image-hosting"
+workers_dev = true
+main = "src/index.ts"
+compatibility_date = "2026-08-15"
+
+[triggers]
+crons = ["0 0 * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "image_db"
+database_id = "8b3db136-e3b6-4aa9-b6e8-9e229b39ec01"
+preview_database_id = "8b3db136-e3b6-4aa9-b6e8-9e229b39ec01"
+
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "images-bucket"
+preview_bucket_name = "images-bucket"
+
+[vars]
+ENVIRONMENT = "production"
+
+[[routes]]
+pattern = "imgof.my.id/*"
+zone_name = "imgof.my.id"
+
+[[routes]]
+pattern = "www.imgof.my.id/*"
+zone_name = "imgof.my.id"

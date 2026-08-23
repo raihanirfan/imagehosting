@@ -1,0 +1,16 @@
+{
+  "Version": "15.0.0",
+  "Name": "ImgHost Cloudflare (Private)",
+  "DestinationType": "ImageUploader",
+  "RequestMethod": "POST",
+  "RequestURL": "https://YOUR_WORKER.workers.dev/api/upload",
+  "Headers": {
+    "Authorization": "<UPLOAD_SECRET>"
+  },
+  "Body": "MultipartFormData",
+  "FileFormName": "file",
+  "URL": "{json:url}",
+  "ThumbnailURL": "{json:url}",
+  "DeletionURL": "{json:delete_url}",
+  "ErrorMessage": "{json:error}"
+}
