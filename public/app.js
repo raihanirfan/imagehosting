@@ -165,7 +165,7 @@ async function handleFilesList(files) {
         }
         row.querySelector('.q-name').textContent=name;
         row.querySelector('.q-size').textContent=fmtBytes(size);
-        try{ const th=row.querySelector('.q-thumb'); if(th && !th.src) { const u=URL.createObjectURL(list[i]); th.src=u; th.onload=()=>URL.revokeObjectURL(u); } }catch{}
+        try{ const th=row.querySelector('.q-thumb'); if(th && !th.src) { const cand=list[i]; if(cand instanceof Blob && typeof cand.type==='string' && cand.type.startsWith('image/')){ const u=URL.createObjectURL(cand); th.src=u; th.onload=()=>URL.revokeObjectURL(u); } } }catch{}
         return row;
     }
     function bindRowFmts(row, url){
