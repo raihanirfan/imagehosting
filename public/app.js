@@ -468,7 +468,7 @@ function renderGallery() {
     const clearBtn = document.getElementById('gallery-clear-btn');
     if (!grid) return;
     const history = getHistory();
-    if (countEl) countEl.textContent = history.length>6 ? '6 of '+history.length : String(history.length);
+    if (countEl) countEl.textContent = String(history.length);
     if (clearBtn) clearBtn.classList.toggle('hidden', history.length === 0);
     if (history.length === 0) {
         grid.innerHTML = '';
@@ -478,7 +478,7 @@ function renderGallery() {
     if (empty) empty.classList.add('hidden');
     grid.innerHTML = '';
     function copyText(t){ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t); else { const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); } }
-    history.slice(0, 6).forEach(function(item){
+    history.forEach(function(item){
         const card = document.createElement('div');
         card.className = 'bg-white/[0.04] border border-white/10 rounded-2xl overflow-hidden flex flex-col';
         card.innerHTML = '<div class="relative aspect-square bg-white/[0.02] flex items-center justify-center overflow-hidden"><img class="g-thumb w-full h-full object-cover" alt=""><div class="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2"><a class="g-view bg-white text-black text-xs px-3 py-1.5 rounded-full font-medium" target="_blank">Open</a><button class="g-del bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-full">Delete</button></div></div><div class="p-3"><div class="flex items-center justify-between gap-2"><span class="g-id font-mono text-xs truncate text-white/70"></span><span class="g-date text-[11px] text-white/30 shrink-0"></span></div><div class="g-fmts flex gap-1.5 mt-2 flex-wrap"></div></div>';
