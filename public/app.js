@@ -50,47 +50,15 @@ function setupEventListeners() {
     }
 
     // Copy buttons (legacy compat: new share-input)
-    document.querySelectorAll('.copy-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const targetId = e.currentTarget.getAttribute('data-target');
-            if (targetId) copyToClipboard(targetId);
-        });
-    });
-    const shareCopy=document.getElementById('share-copy');
-    if(shareCopy) shareCopy.addEventListener('click',()=>copyToClipboard('share-input'));
-    document.querySelectorAll('.fmt-tab').forEach(t=>{
-        t.addEventListener('click',()=>{
-            document.querySelectorAll('.fmt-tab').forEach(x=>x.className='fmt-tab px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600');
-            t.className='fmt-tab px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold';
-            const f=t.dataset.fmt, si=document.getElementById('share-input');
-            const map={direct:document.getElementById('url-input')?.value||'',markdown:document.getElementById('markdown-input')?.value||'',html:document.getElementById('html-input')?.value||'',bbcode:document.getElementById('bbcode-input')?.value||''};
-            if(si) si.value=map[f]||'';
-        });
-    });
-
     // Clear History Button
     const clearHistBtn = document.getElementById('clear-history-btn');
     if (clearHistBtn) {
         clearHistBtn.addEventListener('click', clearHistory);
     }
 
-    // Upload More Button
-    const uploadMoreBtn = document.getElementById('upload-more-btn');
-    if (uploadMoreBtn) {
-        uploadMoreBtn.addEventListener('click', resetUI);
-    }
-
-    // QR Code Button
-    const qrBtn = document.getElementById('qr-btn');
-    if (qrBtn) {
-        qrBtn.addEventListener('click', openCurrentQrModal);
-    }
-
-    // Close QR Modal Buttons
-    const closeQrBtn = document.getElementById('close-qr-btn');
-    const closeQrModalBtn = document.getElementById('close-qr-modal-btn');
-    if (closeQrBtn) closeQrBtn.addEventListener('click', closeQrModal);
-    if (closeQrModalBtn) closeQrModalBtn.addEventListener('click', closeQrModal);
+    // Upload More Button (removed)
+    // QR Code Button (removed)
+    // Close QR Modal Buttons (QR still works via history cards)
 
     // Global Paste Listener (Ctrl + V)
     window.addEventListener('paste', async (e) => {
@@ -122,15 +90,44 @@ function setupEventListeners() {
         }
     });
 
-    // Close QR modal on click outside or Escape
-    window.addEventListener('click', (e) => {
-        const qrModal = document.getElementById('qr-modal');
-        if (e.target === qrModal) closeQrModal();
-    });
+    // URL upload (Catbox-style)
+    const urlInput = document.getElementById('url-input');
+    const urlBtn = document.getElementById('url-upload-btn');
+    if (urlInput && urlBtn) {
+        const doUrl = async () => {
+            const u = urlInput.value.trim();
+            if (!u) return;
+            try { new URL(u); } catch { alert('Invalid URL'); return; }
+            // ponytail: HEAD pre-check, skips POST for non-images
+            try { const h = await fetch(u, { method: 'HEAD' }); const ct = h.headers.get('content-type')||''; if (h.ok && ct && !ct.startsWith('image/')) { alert('URL is not an image ('+ct+')'); return; } } catch {}
+            if (getPageCount() >= PAGE_LIMIT) { if (confirm('Limit 25 per page. Refresh?')) location.reload(); return; }
+            urlBtn.disabled = true; urlBtn.textContent = '…';
+            try {
+                const sel = document.getElementById('expiry-select');
+                const res = await fetch('/api/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: u, expiry: sel?.value || undefined }) });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    const q = document.getElementById('batch-queue'); const rc = document.getElementById('result-card');
+                    if (q && rc) { rc.classList.remove('hidden'); q.classList.remove('hidden');
+                        const row = document.createElement('div'); row.className='bg-white/[0.04] border border-white/10 rounded-xl px-3 py-3';
+                        row.innerHTML = `<div class="flex items-center gap-3"><span class="q-url truncate flex-1 font-mono text-xs text-white/80"></span><span class="text-white/40 text-[11px]">URL</span><a class="q-ok text-emerald-400 text-xs shrink-0" target="_blank">✓</a><a class="q-link text-white/60 text-xs underline truncate max-w-[140px]" target="_blank"></a></div><div class="flex gap-1.5 mt-2"><button class="qfmt text-[11px] px-2.5 py-1 rounded-full bg-white text-black">Copy</button></div>`;
+                        row.querySelector('.q-url').textContent = u.slice(0,48);
+                        row.querySelector('.q-ok').href = data.url;
+                        { const a=row.querySelector('.q-link'); a.href=data.url; a.textContent=data.url; }
+                        row.querySelector('.qfmt').onclick = () => { navigator.clipboard?.writeText(data.url); const b=row.querySelector('.qfmt'); b.textContent='Copied!'; setTimeout(()=>b.textContent='Copy',1200); };
+                        q.appendChild(row);
+                    }
+                    saveToHistory({ id: data.id, url: data.url, delete_token: data.delete_url?.split('token=')[1] || '', timestamp: Date.now() });
+                    incPageCount(1); urlInput.value = '';
+                    if (getPageCount() >= PAGE_LIMIT) setTimeout(()=>{ if(confirm('25 done. Refresh?')) location.reload(); },400);
+                } else alert(data.error || 'Upload URL failed');
+            } catch(e){ alert('Network error'); } finally { urlBtn.disabled=false; urlBtn.textContent='Upload URL'; }
+        };
+        urlBtn.onclick = doUrl;
+        urlInput.addEventListener('keydown', e => { if (e.key === 'Enter') doUrl(); });
+    }
 
-    window.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeQrModal();
-    });
+    // Close modal on Escape (no QR anymore)
 }
 
 // 4. File Processing & Compression
@@ -145,16 +142,11 @@ async function handleFilesList(files) {
     }
     const MAX_COMPRESSION_SIZE_BYTES = 1 * 1024 * 1024;
     const ALLOWED_COMPRESSION_TYPES = ['image/png', 'image/jpeg'];
-    // batch vs single
+    // single -> also use queue row (unifies UI: everything is a row)
     if (list.length === 1) {
-        let f = list[0];
-        if (ALLOWED_COMPRESSION_TYPES.includes(f.type) && f.size > MAX_COMPRESSION_SIZE_BYTES) {
-            try { const c = await resizeAndCompressImage(f, 0.8); if (c) f = c; } catch (e) {}
-        }
-        await uploadFile(f);
-        return;
+        // fall through to multi path with 1 item — deletion, single path isolated
     }
-    // multi: queue sequential with progress
+    // queue sequential with progress
     const progress = document.getElementById('upload-progress');
     const progressFill = document.getElementById('progress-fill');
     const progressStatus = document.getElementById('progress-status');
@@ -167,8 +159,8 @@ async function handleFilesList(files) {
         document.getElementById('result-card')?.classList.remove('hidden');
         let row = queueEl.querySelector(`[data-qi="${i}"]`);
         if(!row){ row=document.createElement('div'); row.dataset.qi=i;
-            row.className='flex flex-col gap-1 text-xs bg-gray-900 border border-gray-700 rounded-lg px-2 py-2';
-            row.innerHTML=`<div class="flex items-center gap-2"><img class="q-thumb w-10 h-10 rounded object-cover bg-gray-800 shrink-0" alt=""><span class="truncate flex-1 font-mono q-name"></span><span class="q-size text-gray-400 shrink-0"></span><span class="q-state text-gray-300 shrink-0"></span><a class="q-link hidden text-blue-400 underline truncate max-w-[140px] shrink-0" target="_blank"></a></div><div class="q-fmts hidden flex gap-1 ml-12"><button data-fmt="direct" class="qfmt px-2 py-0.5 rounded bg-blue-600 text-white">Direct</button><button data-fmt="markdown" class="qfmt px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200">MD</button><button data-fmt="html" class="qfmt px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200">HTML</button><button data-fmt="bbcode" class="qfmt px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200">BB</button></div>`;
+            row.className='bg-white/[0.04] border border-white/10 rounded-xl px-3 py-3';
+            row.innerHTML=`<div class="flex items-center gap-3"><img class="q-thumb w-10 h-10 rounded-lg object-cover bg-white/5 shrink-0" alt=""><span class="truncate flex-1 font-mono text-xs q-name text-white/80"></span><span class="q-size text-white/40 text-[11px] shrink-0"></span><span class="q-state text-white/40 text-xs shrink-0"></span><a class="q-link hidden text-white/60 text-xs underline truncate max-w-[140px] shrink-0" target="_blank"></a></div><div class="q-fmts hidden flex gap-1.5 ml-13 mt-2"><button data-fmt="direct" class="qfmt text-[11px] px-2.5 py-1 rounded-full bg-white text-black font-medium">Direct</button><button data-fmt="markdown" class="qfmt text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 text-white/60">MD</button><button data-fmt="html" class="qfmt text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 text-white/60">HTML</button><button data-fmt="bbcode" class="qfmt text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 text-white/60">BB</button></div>`;
             queueEl.appendChild(row);
         }
         row.querySelector('.q-name').textContent=name;
@@ -180,13 +172,15 @@ async function handleFilesList(files) {
         const fmts=row.querySelector('.q-fmts'); if(!fmts) return;
         fmts.classList.remove('hidden');
         const lk=row.querySelector('.q-link'); lk.textContent=url; lk.href=url; lk.classList.remove('hidden');
-        const st=row.querySelector('.q-state'); st.textContent=' ✓'; st.className='q-state text-emerald-400 shrink-0';
+        const st=row.querySelector('.q-state'); st.textContent=' ✓'; st.className='q-state text-emerald-400 text-xs shrink-0';
         fmts.querySelectorAll('.qfmt').forEach(b=>{
             b.onclick=()=>{
                 const f=b.dataset.fmt;
                 const map={direct:url, markdown:`![Image](${url})`, html:`<img src="${url}" alt="Image" />`, bbcode:`[IMG]${url}[/IMG]`};
                 copyText(map[f]||url);
-                const old=b.textContent; b.textContent='Copied!'; setTimeout(()=>b.textContent=old==='MD'?'MD':old==='BB'?'BB':old,1200);
+                fmts.querySelectorAll('.qfmt').forEach(x=>x.className='qfmt text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 text-white/60');
+                b.className='qfmt text-[11px] px-2.5 py-1 rounded-full bg-white text-black font-medium';
+                const old=b.textContent; b.textContent='Copied!'; setTimeout(()=>{ b.textContent=old; b.className='qfmt text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 text-white/60'; },1200);
             };
         });
     }
@@ -214,24 +208,8 @@ async function handleFilesList(files) {
         } catch (e) { console.error(e); const rr=queueEl?.querySelector(`[data-qi="${i}"]`); if(rr){ rr.querySelector('.q-state').textContent=' ✗'; rr.querySelector('.q-state').className='q-state text-red-400'; const th=rr.querySelector('.q-thumb'); if(th&&!th.src){ try{ const u=URL.createObjectURL(list[i]); th.src=u; }catch{} } } }
     }
     if (progress) progress.classList.add('hidden');
-    // show batch summary: last result + history
-    if (results.length === 1) showResult(results[0]);
-    else if (results.length > 1) {
-        renderHistory();
-        // show summary banner above history
-        const last = results[results.length-1];
-        showResult(last);
-        // prepend simple batch links under result card
-        const card = document.getElementById('result-card');
-        let batch = document.getElementById('batch-links');
-        if (!batch && card) {
-            batch = document.createElement('div'); batch.id = 'batch-links';
-            batch.className = 'mt-3 text-xs bg-gray-900 border border-gray-800 rounded-lg p-3 max-h-40 overflow-auto';
-            card.appendChild(batch);
-        }
-        if (batch) batch.innerHTML = `<b>${results.length} files uploaded:</b><br>` + results.map(r => `<a href="${r.url}" target="_blank" class="text-blue-400 hover:underline break-all">${r.url}</a>`).join('<br>');
-    }
     if (results.length === 0) alert('Upload failed');
+    // preview/detail + batch summary removed — rows are the UI
     const done = results.length;
     if (done) {
         const total = incPageCount(done);
@@ -241,6 +219,9 @@ async function handleFilesList(files) {
 async function handleFiles(file) { return handleFilesList([file]); }
 
 async function resetAfterBatchPlaceholder() {}
+
+// 5. Single upload — now also renders a queue row (shares same look)
+// ponytail: uploadFile delegates to queue row instead of preview card
 
 async function resizeAndCompressImage(file, quality = 0.8) {
     return new Promise((resolve) => {
@@ -294,53 +275,44 @@ async function resizeAndCompressImage(file, quality = 0.8) {
     });
 }
 
-// 5. Upload to Cloudflare Worker
+// 5. Upload to Cloudflare Worker — queue-row mode (no preview card)
 async function uploadFile(file) {
     if (getPageCount() >= PAGE_LIMIT) { if (confirm('Limit 25 uploads per page reached. Refresh now?')) location.reload(); return; }
+    const queueEl = document.getElementById('batch-queue');
+    const card = document.getElementById('result-card');
+    if (queueEl && card) { card.classList.remove('hidden'); queueEl.classList.remove('hidden'); }
     const progress = document.getElementById('upload-progress');
     const progressFill = document.getElementById('progress-fill');
-
-    progress.classList.remove('hidden');
-    progressFill.style.width = '30%';
-
-    const formData = new FormData();
-    formData.append('file', file);
-    const expirySel = document.getElementById('expiry-select');
-    const expiryVal = expirySel ? expirySel.value : '';
-    if (expiryVal) formData.append('expiry', expiryVal);
-
+    if (progress) progress.classList.remove('hidden');
+    if (progressFill) progressFill.style.width = '30%';
+    const thumb = URL.createObjectURL(file);
+    const row = document.createElement('div');
+    row.className='bg-white/[0.04] border border-white/10 rounded-xl px-3 py-3';
+    row.innerHTML=`<div class="flex items-center gap-3"><img class="q-thumb w-10 h-10 rounded-lg object-cover bg-white/5 shrink-0"><span class="q-name truncate flex-1 font-mono text-xs text-white/80"></span><span class="q-size text-white/40 text-[11px] shrink-0"></span><span class="q-state text-white/40 text-xs shrink-0"> … Uploading</span><a class="q-link hidden text-white/60 text-xs underline truncate max-w-[140px] shrink-0" target="_blank"></a></div><div class="q-fmts hidden flex gap-1.5 ml-13 mt-2"><button data-fmt="direct" class="qfmt text-[11px] px-2.5 py-1 rounded-full bg-white text-black font-medium">Direct</button><button data-fmt="markdown" class="qfmt text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 text-white/60">MD</button><button data-fmt="html" class="qfmt text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 text-white/60">HTML</button><button data-fmt="bbcode" class="qfmt text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 text-white/60">BB</button></div>`;
+    { const img=row.querySelector('.q-thumb'); img.src=thumb; }
+    row.querySelector('.q-name').textContent=file.name;
+    row.querySelector('.q-size').textContent=fmtBytes(file.size);
+    queueEl && queueEl.appendChild(row);
+    const expirySel = document.getElementById('expiry-select'); const expiryVal = expirySel ? expirySel.value : '';
+    const fd = new FormData(); fd.append('file', file); if (expiryVal) fd.append('expiry', expiryVal);
     try {
-        progressFill.style.width = '60%';
-        const response = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData,
-        });
-
+        if (progressFill) progressFill.style.width = '60%';
+        const response = await fetch('/api/upload', { method: 'POST', body: fd });
         const data = await response.json();
-
         if (response.ok && data.success) {
-            progressFill.style.width = '100%';
-            
-            saveToHistory({
-                id: data.id,
-                url: data.url,
-                delete_token: data.delete_url?.split('token=')[1] || '',
-                timestamp: Date.now()
-            });
+            if (progressFill) progressFill.style.width = '100%';
+            saveToHistory({ id: data.id, url: data.url, delete_token: data.delete_url?.split('token=')[1] || '', timestamp: Date.now() });
             incPageCount(1);
             if (getPageCount() >= PAGE_LIMIT) setTimeout(() => { if (confirm('25 uploads done. Refresh to continue?')) location.reload(); }, 400);
-
-            showResult(data);
-        } else {
-            const errorMsg = data.error || 'Failed to upload image.';
-            alert('Upload failed: ' + errorMsg);
-        }
-    } catch (err) {
-        alert('Network error occurred while uploading image.');
-        console.error(err);
-    } finally {
-        progress.classList.add('hidden');
-    }
+            const lk=row.querySelector('.q-link'); lk.textContent=data.url; lk.href=data.url; lk.classList.remove('hidden');
+            row.querySelector('.q-state').textContent=' ✓'; row.querySelector('.q-state').className='q-state text-emerald-400 text-xs shrink-0';
+            const fmts=row.querySelector('.q-fmts'); fmts.classList.remove('hidden');
+            const copyTx=(t)=>{ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t); else { const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); } };
+            row.querySelectorAll('.qfmt').forEach(b=>{ b.onclick=()=>{ const f=b.dataset.fmt; const m={direct:data.url, markdown:`![Image](${data.url})`, html:`<img src="${data.url}" alt="Image" />`, bbcode:`[IMG]${data.url}[/IMG]`}; copyTx(m[f]||data.url); row.querySelectorAll('.qfmt').forEach(x=>x.className='qfmt text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 text-white/60'); b.className='qfmt text-[11px] px-2.5 py-1 rounded-full bg-white text-black font-medium'; const o=b.textContent; b.textContent='Copied!'; setTimeout(()=>{ b.textContent=o; b.className='qfmt text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 text-white/60'; },1200); }; });
+            URL.revokeObjectURL(thumb);
+        } else { row.querySelector('.q-state').textContent=' ✗ '+(data.error||'fail'); row.querySelector('.q-state').className='q-state text-red-400 shrink-0'; }
+    } catch (err) { row.querySelector('.q-state').textContent=' ✗ network'; row.querySelector('.q-state').className='q-state text-red-400 shrink-0'; console.error(err);
+    } finally { if (progress) progress.classList.add('hidden'); }
 }
 
 // 6. LocalStorage History
@@ -393,13 +365,10 @@ function renderHistory() {
         card.className = 'bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-gray-500 transition-all flex flex-col group';
         card.innerHTML = `
             <div class="relative aspect-video bg-gray-950 flex items-center justify-center overflow-hidden">
-                <img src="${item.url}" alt="Thumbnail" class="object-cover w-full h-full group-hover:scale-105 transition-transform duration-300">
+                <img alt="Thumbnail" class="hist-thumb object-cover w-full h-full group-hover:scale-105 transition-transform duration-300">
                 <div class="absolute inset-0 bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                     <button class="hist-view-btn bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full transition-colors text-xs" title="View Direct Link">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
-                    </button>
-                    <button class="hist-qr-btn bg-gray-700 hover:bg-gray-600 text-white p-2 rounded-full transition-colors text-xs" title="Scan QR Code">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path></svg>
                     </button>
                     <button class="hist-del-btn bg-red-600 hover:bg-red-700 text-white p-2 rounded-full transition-colors text-xs" title="Delete permanently">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
@@ -407,14 +376,16 @@ function renderHistory() {
                 </div>
             </div>
             <div class="p-3 flex justify-between items-center text-xs text-gray-300 mt-auto bg-gray-850">
-                <span class="truncate pr-2 font-mono">${item.id}</span>
-                <span>${new Date(item.timestamp).toLocaleDateString()}</span>
+                <span class="hist-id truncate pr-2 font-mono"></span>
+                <span class="hist-date"></span>
             </div>
         `;
+        card.querySelector('.hist-thumb').src = item.url;
+        card.querySelector('.hist-id').textContent = item.id;
+        card.querySelector('.hist-date').textContent = new Date(item.timestamp).toLocaleDateString();
 
         // Attach listeners cleanly without inline onclick
         card.querySelector('.hist-view-btn').onclick = () => window.open(item.url, '_blank');
-        card.querySelector('.hist-qr-btn').onclick = () => openQrModal(item.url);
         card.querySelector('.hist-del-btn').onclick = () => deleteHistoryItem(item.id, item.delete_token);
 
         historyGrid.appendChild(card);
@@ -443,59 +414,16 @@ async function deleteHistoryItem(id, deleteToken) {
     }
 }
 
-// 7. UI Actions & Modals
+// 7. UI Actions & Modals — preview removed
 function fmtBytes(n){ if(!n&&n!==0) return ''; if(n<1024) return n+' B'; if(n<1048576) return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(2)+' MB'; }
-function showResult(data) {
-    dropzone.classList.add('hidden');
-    resultCard.classList.remove('hidden');
-
-    document.getElementById('preview-img').src = data.url;
-    const meta = document.getElementById('result-meta');
-    if (meta) {
-        const parts = [];
-        if (data.size) parts.push(fmtBytes(data.size));
-        if (data.mime_type) parts.push(data.mime_type.split('/')[1]?.toUpperCase());
-        meta.textContent = parts.join(' · ');
-    }
-    document.getElementById('url-input').value = data.url;
-    document.getElementById('markdown-input').value = data.markdown || `![Image](${data.url})`;
-    document.getElementById('html-input').value = data.html || `<img src="${data.url}" alt="Image" />`;
-    document.getElementById('bbcode-input').value = `[IMG]${data.url}[/IMG]`;
-    const si=document.getElementById('share-input'); if(si) si.value=data.url;
-    // reset tabs to Direct
-    document.querySelectorAll('.fmt-tab').forEach(x=>x.className='fmt-tab px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600');
-    document.querySelector('.fmt-tab[data-fmt="direct"]') && (document.querySelector('.fmt-tab[data-fmt="direct"]').className='fmt-tab px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold');
-
-    const deleteBtn = document.getElementById('delete-btn');
-    if (deleteBtn) {
-        deleteBtn.onclick = () => deleteImage(data.id, data.delete_url);
-    }
-}
-
-async function deleteImage(id, deleteUrl) {
-    if (!confirm('Are you sure you want to delete this image permanently?')) return;
-
-    try {
-        const response = await fetch(deleteUrl, { method: 'DELETE' });
-        const result = await response.json();
-        if (result.success) {
-            alert('Image deleted.');
-            removeFromHistory(id);
-            resetUI();
-        } else {
-            alert('Failed to delete: ' + (result.error || 'An error occurred.'));
-        }
-    } catch (err) {
-        alert('Failed to contact server to delete image.');
-    }
-}
+function showResult(_data) { /* removed — rows are the UI */ return; }
+async function deleteImage(_id, _deleteUrl) { return; }
 
 function resetUI() {
     resultCard.classList.add('hidden');
     dropzone.classList.remove('hidden');
     if (fileInput) fileInput.value = '';
-    const q=document.getElementById('batch-queue'); if(q){ q.innerHTML=''; q.classList.add('hidden'); }
-    const b=document.getElementById('batch-links'); if(b) b.remove();
+    const q=document.getElementById('batch-queue'); if(q) q.innerHTML='';
 }
 
 function copyToClipboard(id) {
@@ -517,28 +445,6 @@ function copyToClipboard(id) {
     }
 }
 
-// 8. QR Code Modal
-function openQrModal(url) {
-    const qrModal = document.getElementById('qr-modal');
-    const qrImage = document.getElementById('qr-image');
-    const qrUrlText = document.getElementById('qr-url-text');
-    if (!qrModal || !qrImage) return;
-
-    qrImage.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(url)}`;
-    qrUrlText.innerText = url;
-    qrModal.classList.remove('hidden');
-}
-
-function openCurrentQrModal() {
-    const currentUrl = document.getElementById('url-input')?.value;
-    if (currentUrl) {
-        openQrModal(currentUrl);
-    }
-}
-
-function closeQrModal() {
-    const qrModal = document.getElementById('qr-modal');
-    if (qrModal) qrModal.classList.add('hidden');
-}
+// 8. QR removed
 
 })();

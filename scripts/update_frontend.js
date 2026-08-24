@@ -5,7 +5,7 @@ const publicDir = path.join(__dirname, '../public');
 const cssPath = path.join(publicDir, 'style.css');
 const css = fs.readFileSync(cssPath, 'utf8');
 
-const ASSET_VERSION = '1.8';
+const ASSET_VERSION = '2.1';
 
 // 1. Update public HTML files to ensure clean inline CSS and versioned defer JS
 const publicHtmlFiles = ['index.html', 'docs.html', 'faq.html', 'legal.html', 'contact.html', 'status.html', 'stats.html'];

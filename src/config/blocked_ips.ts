@@ -11,4 +11,5 @@ export const ALLOWED_IPS: Set<string> = new Set([
 export const BLOCKED_IPS: Set<string> = new Set([
     '64.89.161.82',
     '107.173.160.145',
+    '98.91.77.46',
 ]);
