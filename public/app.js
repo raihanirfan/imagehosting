@@ -153,6 +153,8 @@ async function handleFilesList(files) {
     const queueEl = document.getElementById('batch-queue');
     const results = [];
     function copyText(t){ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t); else { const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); } }
+    const ALLOWED_THUMB_TYPES = new Set(['image/jpeg','image/png','image/webp','image/gif','image/avif']);
+    function safeThumbUrl(f){ return (f instanceof Blob && ALLOWED_THUMB_TYPES.has(f.type)) ? URL.createObjectURL(f) : null; }
     function queueRow(i, name, size, state){
         if(!queueEl) return null;
         queueEl.classList.remove('hidden');
@@ -165,7 +167,7 @@ async function handleFilesList(files) {
         }
         row.querySelector('.q-name').textContent=name;
         row.querySelector('.q-size').textContent=fmtBytes(size);
-        try{ const th=row.querySelector('.q-thumb'); if(th && !th.src) { const cand=list[i]; if(cand instanceof Blob && typeof cand.type==='string' && cand.type.startsWith('image/')){ const u=URL.createObjectURL(cand); th.src=u; th.onload=()=>URL.revokeObjectURL(u); } } }catch{}
+        try{ const th=row.querySelector('.q-thumb'); if(th && !th.src) { const u=safeThumbUrl(list[i]); if(u){ th.src=u; th.onload=()=>URL.revokeObjectURL(u); } } }catch{}
         return row;
     }
     function bindRowFmts(row, url){
@@ -205,7 +207,7 @@ async function handleFilesList(files) {
                 saveToHistory({ id: data.id, url: data.url, delete_token: data.delete_url?.split('token=')[1] || '', timestamp: Date.now() });
                 const rr = queueEl?.querySelector(`[data-qi="${i}"]`); if(rr) bindRowFmts(rr, data.url);
             } else { const rr=queueEl?.querySelector(`[data-qi="${i}"]`); if(rr){ rr.querySelector('.q-state').textContent=' ✗ fail'; rr.querySelector('.q-state').className='q-state text-red-400 shrink-0'; } }
-        } catch (e) { console.error(e); const rr=queueEl?.querySelector(`[data-qi="${i}"]`); if(rr){ rr.querySelector('.q-state').textContent=' ✗'; rr.querySelector('.q-state').className='q-state text-red-400'; const th=rr.querySelector('.q-thumb'); if(th&&!th.src){ try{ const candidate=list[i]; const isBlobLike = candidate instanceof Blob; const isSafeImage = isBlobLike && typeof candidate.type === 'string' && candidate.type.startsWith('image/'); if (isSafeImage) { const u=URL.createObjectURL(candidate); th.src=u; } }catch{} } } }
+        } catch (e) { console.error(e); const rr=queueEl?.querySelector(`[data-qi="${i}"]`); if(rr){ rr.querySelector('.q-state').textContent=' ✗'; rr.querySelector('.q-state').className='q-state text-red-400'; const th=rr.querySelector('.q-thumb'); if(th&&!th.src){ try{ const u=safeThumbUrl(list[i]); if(u) th.src=u; }catch{} } } }
     }
     if (progress) progress.classList.add('hidden');
     if (results.length === 0) alert('Upload failed');
