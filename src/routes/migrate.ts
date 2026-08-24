@@ -19,17 +19,12 @@ migrateRoute.post('/api/migrate-to-drive', async (c) => {
     const limit = Math.min(Math.max(parseInt(c.req.query('limit') || '20', 10) || 20, 1), 50);
     const cursor = c.req.query('cursor') || null; // last id
 
-    // fetch pending rows ordered by id for stable pagination
-    let q = 'SELECT id, mime_type, drive_file_id FROM images WHERE drive_file_id IS NULL';
-    const params: any[] = [];
-    if (cursor) {
-        q += ' AND id > ?';
-        params.push(cursor);
-    }
-    q += ' ORDER BY id ASC LIMIT ?';
-    params.push(limit);
+    // fetch pending rows ordered by id for stable pagination (static parameterized queries for static analysis)
+    const dbQuery = cursor
+        ? c.env.DB.prepare('SELECT id, mime_type, drive_file_id FROM images WHERE drive_file_id IS NULL AND id > ? ORDER BY id ASC LIMIT ?').bind(cursor, limit)
+        : c.env.DB.prepare('SELECT id, mime_type, drive_file_id FROM images WHERE drive_file_id IS NULL ORDER BY id ASC LIMIT ?').bind(limit);
 
-    const { results: rows } = await c.env.DB.prepare(q).bind(...params).all<any>();
+    const { results: rows } = await dbQuery.all<any>();
     if (!rows || rows.length === 0) {
         return c.json({ success: true, migrated: 0, next_cursor: null, done: true });
     }

@@ -44,6 +44,8 @@ function isValidRemoteUrl(urlString: string): boolean {
     try {
         const parsed = new URL(urlString);
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+        if (parsed.port && parsed.port !== '80' && parsed.port !== '443') return false;
+        if (parsed.username || parsed.password) return false;
         const host = parsed.hostname.toLowerCase();
         // 0.0.0.0 + private/loopback/link-local + cloud metadata + ULA/link-local ipv6
         if (
@@ -60,7 +62,8 @@ function isValidRemoteUrl(urlString: string): boolean {
             host.startsWith('fd') ||
             host.startsWith('fe80') ||        // fe80::/10 link-local
             host.endsWith('.local') ||
-            host.endsWith('.internal')
+            host.endsWith('.internal') ||
+            host.endsWith('.arpa')
         ) {
             return false;
         }
