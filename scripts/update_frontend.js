@@ -82,7 +82,8 @@ frontendRoute.get('/robots.txt', (c) => {
         'Disallow: /admin-login',
         'Disallow: /internal-backup',
         'Disallow: /admin-secret',
-        'Disallow: /.env'
+        'Disallow: /.env',
+        'Sitemap: ' + new URL(c.req.url).origin + '/sitemap.xml'
     ].join('\\n');
     return new Response(robots, {
         headers: {
@@ -100,6 +101,15 @@ frontendRoute.get('/llms.txt', (c) => {
             'Cache-Control': 'public, max-age=86400, stale-while-revalidate=604800'
         }
     });
+});
+
+frontendRoute.get('/sitemap.xml', function(c) {
+    var origin = new URL(c.req.url).origin;
+    var pages = ['', '/legal', '/faq', '/docs', '/contact', '/status', '/stats'];
+    var now = new Date().toISOString();
+    var urls = pages.map(function(p) { return '  <url><loc>' + origin + (p || '/') + '</loc><lastmod>' + now + '</lastmod></url>'; }).join(String.fromCharCode(10));
+    var xml = '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + String.fromCharCode(10) + urls + String.fromCharCode(10) + '</urlset>';
+    return new Response(xml, { headers: { 'Content-Type': 'application/xml; charset=UTF-8', 'Cache-Control': 'public, max-age=86400' } });
 });
 
 // 2. Honeypot Trigger Handler

@@ -164,6 +164,14 @@ app.post('/api/admin/unlock/:id', async (c) => {
 });
 
 // Fallback 404 for unhandled routes
+app.get('/.well-known/security.txt', (c) => c.text(
+    'Contact: mailto:admin@imgof.my.id\n' +
+    'Expires: 2027-08-24T00:00:00.000Z\n' +
+    'Preferred-Languages: en, id\n' +
+    'Canonical: https://imgof.my.id/.well-known/security.txt\n',
+    200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=86400' }
+));
+app.get('/security.txt', (c) => c.redirect('/.well-known/security.txt', 301));
 app.notFound((c) => {
     return c.json({ success: false, error: 'Not Found' }, 404);
 });
