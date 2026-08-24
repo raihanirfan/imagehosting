@@ -61,7 +61,7 @@ frontendRoute.get('/llms.txt', (c) => {
 
 frontendRoute.get('/sitemap.xml', function(c) {
     var origin = new URL(c.req.url).origin;
-    var pages = ['', '/legal', '/faq', '/docs', '/contact', '/status', '/stats'];
+    var pages = ['', '/legal', '/faq', '/docs', '/contact', '/status', '/stats', '/my'];
     var now = new Date().toISOString();
     var urls = pages.map(function(p) { return '  <url><loc>' + origin + (p || '/') + '</loc><lastmod>' + now + '</lastmod></url>'; }).join(String.fromCharCode(10));
     var xml = '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + String.fromCharCode(10) + urls + String.fromCharCode(10) + '</urlset>';
