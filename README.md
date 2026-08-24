@@ -1,13 +1,41 @@
-# ImgOF — High-Performance Serverless Image Hosting
+<div align="center">
+  <img src="public/icon.svg" width="96" height="96" alt="ImgOF Logo" />
+  <h1>ImgOF — Serverless Image Hosting</h1>
+  <p>Ultra-fast, privacy-first, zero-login image hosting platform engineered on Cloudflare's global edge network.</p>
 
-[![Cloudflare Workers](https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
-[![Cloudflare D1](https://img.shields.io/badge/Cloudflare-D1_SQLite-F38020?logo=sqlite&logoColor=white)](https://developers.cloudflare.com/d1/)
-[![Cloudflare R2](https://img.shields.io/badge/Cloudflare-R2_Storage-F38020?logo=cloudflare&logoColor=white)](https://developers.cloudflare.com/r2/)
-[![Google Drive](https://img.shields.io/badge/Google_Drive-Multi--Storage-4285F4?logo=googledrive&logoColor=white)](https://developers.google.com/drive)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+  <p>
+    <a href="https://imgof.my.id"><strong>🌐 Website (imgof.my.id)</strong></a> •
+    <a href="https://imgof.my.id/docs"><strong>📖 API Docs</strong></a> •
+    <a href="https://imgof.my.id/status"><strong>⚡ Status</strong></a> •
+    <a href="https://imgof.my.id/stats"><strong>📊 Statistics</strong></a>
+  </p>
 
-**ImgOF** ([imgof.my.id](https://imgof.my.id)) is a high-speed, privacy-first, zero-login image hosting platform engineered on Cloudflare's global edge network.
+  <p>
+    <a href="https://workers.cloudflare.com/"><img src="https://img.shields.io/badge/Cloudflare-Workers-F38020?logo=cloudflare&logoColor=white" alt="Cloudflare Workers" /></a>
+    <a href="https://developers.cloudflare.com/d1/"><img src="https://img.shields.io/badge/Cloudflare-D1_SQLite-F38020?logo=sqlite&logoColor=white" alt="Cloudflare D1" /></a>
+    <a href="https://developers.cloudflare.com/r2/"><img src="https://img.shields.io/badge/Cloudflare-R2_Storage-F38020?logo=cloudflare&logoColor=white" alt="Cloudflare R2" /></a>
+    <a href="https://developers.google.com/drive"><img src="https://img.shields.io/badge/Google_Drive-Multi--Storage-4285F4?logo=googledrive&logoColor=white" alt="Google Drive" /></a>
+    <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5.0-3178C6?logo=typescript&logoColor=white" alt="TypeScript" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT" /></a>
+  </p>
+</div>
+
+---
+
+## 🏗️ Architecture & Data Flow
+
+```mermaid
+graph TD
+    Client[📱 Client / Browser / ShareX] -->|Upload / View| Edge[⚡ Cloudflare Global Edge CDN]
+    Edge -->|Hono App / Security Middleware| Worker[⚙️ Cloudflare Worker Engine]
+    
+    Worker -->|Metadata & IP Access Control| D1[(🗄️ Cloudflare D1 SQLite)]
+    Worker -->|Tier 1: Fast Object Cache| R2[(📦 Cloudflare R2 Storage)]
+    Worker -->|Tier 2: Primary Backup| GDrive[(📁 Google Drive API)]
+    Worker -->|Tier 3: Fallback Failover| Pixel[(☁️ Pixeldrain / Buzzheavier)]
+    
+    Edge -.->|1-Year Immutable Edge Cache| Client
+```
 
 ---
 
