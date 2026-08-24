@@ -26,6 +26,15 @@
             </div>
             <button id="gallery-clear-btn" class="text-xs text-white/40 hover:text-red-400 underline hidden">Clear all</button>
         </div>
+        <div id="gallery-toolbar" class="hidden flex flex-wrap items-center gap-2 mb-4">
+            <label class="text-xs text-white/60 flex items-center gap-1.5 cursor-pointer"><input id="gallery-select-all" type="checkbox" class="accent-white"> Select all</label>
+            <span id="gallery-sel-count" class="text-xs text-white/30">0 selected</span>
+            <div class="flex gap-1.5 ml-auto flex-wrap">
+                <button id="gallery-copy-btn" class="text-[11px] px-3 py-1.5 rounded-full bg-white text-black font-medium">Copy links</button>
+                <select id="gallery-copy-fmt" class="text-[11px] px-2 py-1.5 rounded-full bg-white/10 text-white/70 border border-white/10"><option value="direct">Direct</option><option value="md">MD</option><option value="html">HTML</option><option value="bb">BB</option></select>
+                <button id="gallery-del-sel-btn" class="text-[11px] px-3 py-1.5 rounded-full bg-red-600 hover:bg-red-700 text-white">Delete selected</button>
+            </div>
+        </div>
         <div id="gallery-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4"></div>
         <div id="gallery-empty" class="hidden text-center py-16 border border-dashed border-white/10 rounded-2xl">
             <p class="text-sm text-white/60">No uploads yet on this device</p>
@@ -40,6 +49,6 @@
             <a href="/legal" class="hover:text-white underline">Legal</a>
         </footer>
     </div>
-    <script src="app.js?v=2.3" defer></script>
+    <script src="app.js?v=2.4" defer></script>
 </body>
 </html>

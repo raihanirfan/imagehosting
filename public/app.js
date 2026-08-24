@@ -470,6 +470,13 @@ function renderGallery() {
     const history = getHistory();
     if (countEl) countEl.textContent = String(history.length);
     if (clearBtn) clearBtn.classList.toggle('hidden', history.length === 0);
+    var toolbar = document.getElementById('gallery-toolbar');
+    var selAll = document.getElementById('gallery-select-all');
+    var selCount = document.getElementById('gallery-sel-count');
+    var copyBtn = document.getElementById('gallery-copy-btn');
+    var copyFmt = document.getElementById('gallery-copy-fmt');
+    var delSelBtn = document.getElementById('gallery-del-sel-btn');
+    if (toolbar) toolbar.classList.toggle('hidden', history.length === 0);
     if (history.length === 0) {
         grid.innerHTML = '';
         if (empty) empty.classList.remove('hidden');
@@ -478,11 +485,17 @@ function renderGallery() {
     if (empty) empty.classList.add('hidden');
     grid.innerHTML = '';
     function copyText(t){ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t); else { const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); } }
+    var selected = new Set();
+    function refreshSelUI(){ if(selCount) selCount.textContent=selected.size+' selected'; if(selAll) selAll.checked=selected.size>0 && selected.size===history.length; }
+    if(selAll) selAll.onchange=function(){ selected.clear(); if(this.checked) history.forEach(function(h){selected.add(h.id)}); grid.querySelectorAll('.g-chk').forEach(function(c){c.checked=selAll.checked}); refreshSelUI(); };
+    if(copyBtn) copyBtn.onclick=function(){ if(selected.size===0){ copyBtn.textContent='Select images first'; setTimeout(function(){copyBtn.textContent='Copy links'},1200); return; } var fmt=copyFmt?copyFmt.value:'direct'; var lines=[]; history.forEach(function(h){ if(!selected.has(h.id)) return; var u=h.url; var v= fmt==='md' ? '!['+h.id+']('+u+')' : fmt==='html' ? '<img src="'+u+'" alt="'+h.id+'" />' : fmt==='bb' ? '[IMG]'+u+'[/IMG]' : u; lines.push(v); }); copyText(lines.join('\n')); var old=copyBtn.textContent; copyBtn.textContent='Copied '+lines.length+'!'; setTimeout(function(){copyBtn.textContent=old},1200); };
+    if(delSelBtn) delSelBtn.onclick=async function(){ if(selected.size===0) return; if(!confirm('Delete '+selected.size+' selected images permanently?')) return; var ids=[...selected]; for(var j=0;j<ids.length;j++){ var h=history.find(function(x){return x.id===ids[j]}); if(!h) continue; try{ var r=await fetch('/api/delete/'+h.id+'?token='+encodeURIComponent(h.delete_token),{method:'DELETE'}); var js=await r.json(); if(js.success) removeFromHistory(h.id); }catch(e){} } selected.clear(); refreshSelUI(); renderGallery(); };
     history.forEach(function(item){
         const card = document.createElement('div');
         card.className = 'bg-white/[0.04] border border-white/10 rounded-2xl overflow-hidden flex flex-col';
-        card.innerHTML = '<div class="relative aspect-square bg-white/[0.02] flex items-center justify-center overflow-hidden"><img class="g-thumb w-full h-full object-cover" alt=""><div class="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2"><a class="g-view bg-white text-black text-xs px-3 py-1.5 rounded-full font-medium" target="_blank">Open</a><button class="g-del bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-full">Delete</button></div></div><div class="p-3"><div class="flex items-center justify-between gap-2"><span class="g-id font-mono text-xs truncate text-white/70"></span><span class="g-date text-[11px] text-white/30 shrink-0"></span></div><div class="g-fmts flex gap-1.5 mt-2 flex-wrap"></div></div>';
+        card.innerHTML = '<div class="relative aspect-square bg-white/[0.02] flex items-center justify-center overflow-hidden"><input type="checkbox" class="g-chk absolute top-2 left-2 w-4 h-4 accent-white"><img class="g-thumb w-full h-full object-cover" alt=""><div class="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2"><a class="g-view bg-white text-black text-xs px-3 py-1.5 rounded-full font-medium" target="_blank">Open</a><button class="g-del bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-full">Delete</button></div></div><div class="p-3"><div class="flex items-center justify-between gap-2"><span class="g-id font-mono text-xs truncate text-white/70"></span><span class="g-date text-[11px] text-white/30 shrink-0"></span></div><div class="g-fmts flex gap-1.5 mt-2 flex-wrap"></div></div>';
         const thumb = card.querySelector('.g-thumb'); thumb.src = item.url;
+        var chk = card.querySelector('.g-chk'); chk.onchange=function(){ if(this.checked) selected.add(item.id); else selected.delete(item.id); refreshSelUI(); };
         card.querySelector('.g-id').textContent = item.id;
         card.querySelector('.g-date').textContent = new Date(item.timestamp).toLocaleDateString();
         card.querySelector('.g-view').href = item.url;
