@@ -333,6 +333,7 @@ function saveToHistory(item) {
     filtered.unshift(item);
     localStorage.setItem(HISTORY_KEY, JSON.stringify(filtered));
     renderHistory();
+    if (typeof renderGallery === 'function') try { renderGallery(); } catch {}
 }
 
 function removeFromHistory(id) {
@@ -340,18 +341,24 @@ function removeFromHistory(id) {
     const filtered = history.filter(h => h.id !== id);
     localStorage.setItem(HISTORY_KEY, JSON.stringify(filtered));
     renderHistory();
+    if (typeof renderGallery === 'function') try { renderGallery(); } catch {}
 }
 
 function clearHistory() {
     if (confirm('Are you sure you want to clear your local upload history? This will NOT delete images from the server.')) {
         localStorage.removeItem(HISTORY_KEY);
         renderHistory();
+        // also refresh My Gallery grid if on /my
+        if (typeof renderGallery === 'function') try { renderGallery(); } catch {}
     }
 }
 
 function renderHistory() {
     const history = getHistory();
-    if (!historySection || !historyGrid) return;
+    if (!historySection || !historyGrid) {
+        // not on index — still keep My Gallery fresh via storage event
+        return;
+    }
 
     if (history.length === 0) {
         historySection.classList.add('hidden');
@@ -448,5 +455,51 @@ function copyToClipboard(id) {
 }
 
 // 8. QR removed
+// 9. My Gallery page — renders imghost_history with copy formats + delete
+function renderGallery() {
+    const grid = document.getElementById('gallery-grid');
+    const empty = document.getElementById('gallery-empty');
+    const countEl = document.getElementById('gallery-count');
+    const clearBtn = document.getElementById('gallery-clear-btn');
+    if (!grid) return;
+    const history = getHistory();
+    if (countEl) countEl.textContent = String(history.length);
+    if (clearBtn) clearBtn.classList.toggle('hidden', history.length === 0);
+    if (history.length === 0) {
+        grid.innerHTML = '';
+        if (empty) empty.classList.remove('hidden');
+        return;
+    }
+    if (empty) empty.classList.add('hidden');
+    grid.innerHTML = '';
+    function copyText(t){ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t); else { const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); } }
+    history.forEach(function(item){
+        const card = document.createElement('div');
+        card.className = 'bg-white/[0.04] border border-white/10 rounded-2xl overflow-hidden flex flex-col';
+        card.innerHTML = '<div class="relative aspect-square bg-white/[0.02] flex items-center justify-center overflow-hidden"><img class="g-thumb w-full h-full object-cover" alt=""><div class="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2"><a class="g-view bg-white text-black text-xs px-3 py-1.5 rounded-full font-medium" target="_blank">Open</a><button class="g-del bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-full">Delete</button></div></div><div class="p-3"><div class="flex items-center justify-between gap-2"><span class="g-id font-mono text-xs truncate text-white/70"></span><span class="g-date text-[11px] text-white/30 shrink-0"></span></div><div class="g-fmts flex gap-1.5 mt-2 flex-wrap"></div></div>';
+        const thumb = card.querySelector('.g-thumb'); thumb.src = item.url;
+        card.querySelector('.g-id').textContent = item.id;
+        card.querySelector('.g-date').textContent = new Date(item.timestamp).toLocaleDateString();
+        card.querySelector('.g-view').href = item.url;
+        card.querySelector('.g-del').onclick = function(){ deleteHistoryItem(item.id, item.delete_token); };
+        const fmts = card.querySelector('.g-fmts');
+        var url = item.url;
+        var opts = [{k:'direct',label:'Direct',v:url},{k:'md',label:'MD',v:'![Image]('+url+')'},{k:'html',label:'HTML',v:'<img src="'+url+'" alt="Image" />'},{k:'bb',label:'BB',v:'[IMG]'+url+'[/IMG]'}];
+        opts.forEach(function(o){
+            var b=document.createElement('button'); b.className='text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 text-white/60'; b.textContent=o.label;
+            b.onclick=function(){ copyText(o.v); var old=b.textContent; b.textContent='Copied!'; b.className='text-[11px] px-2.5 py-1 rounded-full bg-white text-black font-medium'; setTimeout(function(){ b.textContent=old; b.className='text-[11px] px-2.5 py-1 rounded-full bg-white/10 hover:bg-white/15 text-white/60'; },1200); };
+            fmts.appendChild(b);
+        });
+        grid.appendChild(card);
+    });
+}
+(function(){
+    if (document.getElementById('gallery-grid')) {
+        document.addEventListener('DOMContentLoaded', renderGallery);
+        if (document.readyState !== 'loading') renderGallery();
+        var cb=document.getElementById('gallery-clear-btn'); if(cb) cb.onclick=function(){ clearHistory(); renderGallery(); };
+        window.addEventListener('storage', function(e){ if(e.key===HISTORY_KEY) renderGallery(); });
+    }
+})();
 
 })();

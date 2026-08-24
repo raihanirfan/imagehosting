@@ -5,10 +5,10 @@ const publicDir = path.join(__dirname, '../public');
 const cssPath = path.join(publicDir, 'style.css');
 const css = fs.readFileSync(cssPath, 'utf8');
 
-const ASSET_VERSION = '2.1';
+const ASSET_VERSION = '2.2';
 
 // 1. Update public HTML files to ensure clean inline CSS and versioned defer JS
-const publicHtmlFiles = ['index.html', 'docs.html', 'faq.html', 'legal.html', 'contact.html', 'status.html', 'stats.html'];
+const publicHtmlFiles = ['index.html', 'my.html', 'docs.html', 'faq.html', 'legal.html', 'contact.html', 'status.html', 'stats.html'];
 publicHtmlFiles.forEach(file => {
     const filePath = path.join(publicDir, file);
     if (!fs.existsSync(filePath)) return;
@@ -34,6 +34,7 @@ const legalHtml = fs.readFileSync(path.join(publicDir, 'legal.html'), 'utf8');
 const contactHtml = fs.readFileSync(path.join(publicDir, 'contact.html'), 'utf8');
 const statusHtml = fs.readFileSync(path.join(publicDir, 'status.html'), 'utf8');
 const statsHtml = fs.readFileSync(path.join(publicDir, 'stats.html'), 'utf8');
+const myHtml = fs.readFileSync(path.join(publicDir, 'my.html'), 'utf8');
 const manifestJson = fs.readFileSync(path.join(publicDir, 'manifest.json'), 'utf8');
 const iconSvg = fs.readFileSync(path.join(publicDir, 'icon.svg'), 'utf8');
 const appJs = fs.readFileSync(path.join(publicDir, 'app.js'), 'utf8');
@@ -55,6 +56,7 @@ const DOCS_HTML_CONTENT = ${JSON.stringify(docsHtml)};
 const CONTACT_HTML_CONTENT = ${JSON.stringify(contactHtml)};
 const STATUS_HTML_CONTENT = ${JSON.stringify(statusHtml)};
 const STATS_HTML_CONTENT = ${JSON.stringify(statsHtml)};
+const MY_HTML_CONTENT = ${JSON.stringify(myHtml)};
 const MANIFEST_CONTENT = ${JSON.stringify(manifestJson)};
 const ICON_SVG_CONTENT = ${JSON.stringify(iconSvg)};
 const JS_CONTENT = ${JSON.stringify(appJs)};
@@ -295,6 +297,10 @@ frontendRoute.get('/contact', (c) => {
 
 frontendRoute.get('/status', (c) => {
     return createHtmlResponse(STATUS_HTML_CONTENT);
+});
+
+frontendRoute.get('/my', (c) => {
+    return createHtmlResponse(MY_HTML_CONTENT);
 });
 
 frontendRoute.get('/stats', (c) => {
