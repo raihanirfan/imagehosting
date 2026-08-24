@@ -17,6 +17,14 @@ const NOT_FOUND_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 
   <text x="400" y="365" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#94a3b8" text-anchor="middle">This image has been deleted or does not exist</text>
   <text x="400" y="440" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#38bdf8" text-anchor="middle">ImgOF — imgof.my.id</text>
 </svg>`;
+const LOCKED_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <rect width="100%" height="100%" fill="#0f172a"/>
+  <rect x="150" y="100" width="500" height="400" rx="16" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+  <text x="400" y="300" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="22" font-weight="bold" fill="#f8fafc" text-anchor="middle">Content Locked</text>
+  <text x="400" y="335" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" fill="#94a3b8" text-anchor="middle">Blocked due to copyright claim (DMCA) — under review</text>
+  <text x="400" y="360" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" fill="#64748b" text-anchor="middle">Counter-notice: admin@imgof.my.id</text>
+  <text x="400" y="440" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#38bdf8" text-anchor="middle">ImgOF — imgof.my.id</text>
+</svg>`;
 
 viewRoute.get('/i/:id', async (c) => {
     const rawId = c.req.param('id');
@@ -58,6 +66,22 @@ viewRoute.get('/i/:id', async (c) => {
             headers: {
                 'Content-Type': 'image/svg+xml; charset=UTF-8',
                 'Cache-Control': 'public, max-age=60',
+                'X-Content-Type-Options': 'nosniff'
+            }
+        });
+    }
+
+    // 2c. DMCA lock — retain R2 bytes, block all delivery (Mocha-style)
+    if ((imageRecord as any)?.locked_at) {
+        const accept = c.req.header('Accept') || '';
+        if (accept.includes('application/json')) {
+            return c.json({ success: false, error: 'Content locked due to copyright claim (DMCA) — under review. Counter-notice: admin@imgof.my.id', locked_at: (imageRecord as any).locked_at }, 451);
+        }
+        return new Response(LOCKED_SVG, {
+            status: 451,
+            headers: {
+                'Content-Type': 'image/svg+xml; charset=UTF-8',
+                'Cache-Control': 'no-store',
                 'X-Content-Type-Options': 'nosniff'
             }
         });

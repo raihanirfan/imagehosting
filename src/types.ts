@@ -31,4 +31,6 @@ export interface ImageRecord {
     uploader_ip?: string | null;
     uploader_ip_enc?: string | null;
     expires_at?: number | null;
+    locked_at?: number | null;
+    locked_reason?: string | null;
 }

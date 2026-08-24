@@ -10,7 +10,7 @@ import statsRoute from './routes/stats';
 import keepaliveRoute, { runKeepaliveJob } from './routes/keepalive';
 import backupRoute, { exportD1ToDrive } from './routes/backup';
 import frontendRoute from './routes/frontend';
-import { getImageById } from './db/queries';
+import { getImageById, lockImage, unlockImage } from './db/queries';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -126,6 +126,41 @@ app.get('/api/admin/ip/:id', async (c) => {
     } catch (e: any) {
         return c.json({ success: false, error: e?.message || 'decrypt failed' }, 500);
     }
+});
+
+// Admin DMCA lock / unlock — retain R2 bytes, block 451 until counter-notice
+// POST /api/admin/lock/:id { reason?: string }  — Bearer UPLOAD_SECRET
+// POST /api/admin/unlock/:id                — Bearer UPLOAD_SECRET
+app.post('/api/admin/lock/:id', async (c) => {
+    const secret = c.env.UPLOAD_SECRET;
+    const hdr = c.req.header('Authorization') || c.req.header('X-API-Key') || '';
+    const token = hdr.startsWith('Bearer ') ? hdr.slice(7).trim() : hdr.trim();
+    if (!secret || token !== secret) return c.json({ success: false, error: 'Unauthorized' }, 401);
+    const id = c.req.param('id');
+    const row = await getImageById(c.env.DB, id) as any;
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    if (row.locked_at) return c.json({ success: false, error: 'Already locked', locked_at: row.locked_at }, 409);
+    let reason: string | undefined;
+    try { reason = (await c.req.json() as any)?.reason; } catch {}
+    await lockImage(c.env.DB, id, reason);
+    const cache = caches.default;
+    const origin = new URL(c.req.url).origin;
+    const base = `${origin}/i/${id}`;
+    await cache.delete(new Request(base)).catch(() => {});
+    for (const ext of ['.webp','.png','.jpg','.jpeg','.gif','.svg']) await cache.delete(new Request(base + ext)).catch(() => {});
+    return c.json({ success: true, id, locked: true, reason: reason || null });
+});
+app.post('/api/admin/unlock/:id', async (c) => {
+    const secret = c.env.UPLOAD_SECRET;
+    const hdr = c.req.header('Authorization') || c.req.header('X-API-Key') || '';
+    const token = hdr.startsWith('Bearer ') ? hdr.slice(7).trim() : hdr.trim();
+    if (!secret || token !== secret) return c.json({ success: false, error: 'Unauthorized' }, 401);
+    const id = c.req.param('id');
+    const row = await getImageById(c.env.DB, id) as any;
+    if (!row) return c.json({ success: false, error: 'Not found' }, 404);
+    if (!row.locked_at) return c.json({ success: false, error: 'Not locked' }, 409);
+    await unlockImage(c.env.DB, id);
+    return c.json({ success: true, id, locked: false });
 });
 
 // Fallback 404 for unhandled routes

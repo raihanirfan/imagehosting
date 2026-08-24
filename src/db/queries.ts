@@ -38,6 +38,30 @@ export async function deleteImageRecord(db: D1Database, id: string): Promise<voi
     await db.prepare('DELETE FROM images WHERE id = ?').bind(id).run();
 }
 
+export async function lockImage(db: D1Database, id: string, reason?: string): Promise<void> {
+    try {
+        await db.prepare('UPDATE images SET locked_at = ?, locked_reason = ? WHERE id = ?').bind(Date.now(), reason || null, id).run();
+    } catch (e: any) {
+        if (String(e?.message || e).includes('no such column')) {
+            // ponytail: auto-migrate on first lock if column missing; upgrade to wrangler migrations if schema grows
+            await db.prepare('ALTER TABLE images ADD COLUMN locked_at INTEGER').run().catch(() => {});
+            await db.prepare('ALTER TABLE images ADD COLUMN locked_reason TEXT').run().catch(() => {});
+            await db.prepare('UPDATE images SET locked_at = ?, locked_reason = ? WHERE id = ?').bind(Date.now(), reason || null, id).run();
+        } else throw e;
+    }
+}
+export async function unlockImage(db: D1Database, id: string): Promise<void> {
+    try {
+        await db.prepare('UPDATE images SET locked_at = NULL, locked_reason = NULL WHERE id = ?').bind(id).run();
+    } catch (e: any) {
+        if (String(e?.message || e).includes('no such column')) {
+            await db.prepare('ALTER TABLE images ADD COLUMN locked_at INTEGER').run().catch(() => {});
+            await db.prepare('ALTER TABLE images ADD COLUMN locked_reason TEXT').run().catch(() => {});
+            await db.prepare('UPDATE images SET locked_at = NULL, locked_reason = NULL WHERE id = ?').bind(id).run();
+        } else throw e;
+    }
+}
+
 export interface StorageStats {
     total_images: number;
     total_size_bytes: number;

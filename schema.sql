@@ -12,7 +12,9 @@ CREATE TABLE IF NOT EXISTS images (
     uploader_ip_enc TEXT,               -- Encrypted IP
     pixeldrain_id TEXT,                 -- Pixeldrain file ID
     buzzheavier_id TEXT,                -- Buzzheavier file ID
-    expires_at INTEGER                  -- nullable unix ms; null = permanent
+    expires_at INTEGER,                 -- nullable unix ms; null = permanent
+    locked_at INTEGER,                  -- DMCA lock timestamp ms; null = not locked (ponytail: retains R2, blocks serve until unlock)
+    locked_reason TEXT                  -- optional reason for lock
 );
 
 CREATE INDEX IF NOT EXISTS idx_images_hash ON images(hash);
