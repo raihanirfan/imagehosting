@@ -187,37 +187,48 @@ frontendRoute.get('/sharex.sxcu', (c) => {
     });
 });
 
-// 5. Open Graph Image Viewer Page (/v/:id)
+// 5. Open Graph Image Viewer Page (/v/:id) with Strict Sanitization (Anti-Reflected XSS)
 frontendRoute.get('/v/:id', async (c) => {
-    const rawParam = c.req.param('id');
-    const safeId = rawParam.replace(/[^a-zA-Z0-9._-]/g, '');
-    if (!safeId) {
+    const rawParam = c.req.param('id') || '';
+    // Strict alphanumeric format check (max 32 chars)
+    if (!/^[a-zA-Z0-9_-]{1,32}(\\.[a-zA-Z0-9]{1,10})?$/.test(rawParam)) {
         return c.text('Invalid Image ID', 400);
     }
-    const cleanId = safeId.replace(/\\.[^/.]+$/, '');
+    const cleanId = rawParam.replace(/\\.[^/.]+$/, '');
     const origin = new URL(c.req.url).origin;
-    const imageUrl = \`\${origin}/i/\${safeId}\`;
+    const imageUrl = \`\${origin}/i/\${encodeURIComponent(rawParam)}\`;
+
+    const escapeHtml = (str: string) => String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+
+    const safeCleanId = escapeHtml(cleanId);
+    const safeImageUrl = escapeHtml(imageUrl);
+    const safeOrigin = escapeHtml(origin);
 
     const viewerHtml = \`<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ImgOF — \${cleanId}</title>
+    <title>ImgOF — \${safeCleanId}</title>
     <meta name="theme-color" content="#0f172a">
     <link rel="icon" type="image/svg+xml" href="/icon.svg">
-    <link rel="canonical" href="\${origin}/v/\${cleanId}">
+    <link rel="canonical" href="\${safeOrigin}/v/\${safeCleanId}">
     
     <!-- Open Graph & Social Media Cards -->
     <meta property="og:site_name" content="ImgOF">
     <meta property="og:type" content="website">
-    <meta property="og:title" content="ImgOF — View Image \${cleanId}">
+    <meta property="og:title" content="ImgOF — View Image \${safeCleanId}">
     <meta property="og:description" content="View image hosted on ImgOF.">
-    <meta property="og:image" content="\${imageUrl}">
-    <meta property="og:url" content="\${origin}/v/\${cleanId}">
+    <meta property="og:image" content="\${safeImageUrl}">
+    <meta property="og:url" content="\${safeOrigin}/v/\${safeCleanId}">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="ImgOF — View Image \${cleanId}">
-    <meta name="twitter:image" content="\${imageUrl}">
+    <meta name="twitter:title" content="ImgOF — View Image \${safeCleanId}">
+    <meta name="twitter:image" content="\${safeImageUrl}">
     
     <style>\${CSS_CONTENT}</style>
 </head>
@@ -227,13 +238,13 @@ frontendRoute.get('/v/:id', async (c) => {
             <span class="text-blue-500">◀</span> ImgOF
         </a>
         <div class="flex items-center gap-3">
-            <a href="\${imageUrl}" target="_blank" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors">Direct Image</a>
+            <a href="\${safeImageUrl}" target="_blank" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-lg text-xs font-semibold transition-colors">Direct Image</a>
         </div>
     </div>
     
     <main class="w-full max-w-4xl flex flex-col items-center justify-center my-auto">
         <div class="bg-gray-950 p-2 rounded-2xl border border-gray-800 shadow-2xl overflow-hidden max-w-full">
-            <img src="\${imageUrl}" alt="Hosted on ImgOF" class="max-h-[75vh] w-auto object-contain rounded-xl mx-auto shadow-md">
+            <img src="\${safeImageUrl}" alt="Hosted on ImgOF" class="max-h-[75vh] w-auto object-contain rounded-xl mx-auto shadow-md">
         </div>
     </main>
     
