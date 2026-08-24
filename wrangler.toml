@@ -1,3 +1,4 @@
+account_id = "2a32b236d6208d964e770d98a6577ef5"
 name = "image-hosting"
 workers_dev = true
 main = "src/index.ts"
