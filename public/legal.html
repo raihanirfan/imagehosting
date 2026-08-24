@@ -95,9 +95,10 @@
                     6. Kebijakan Privasi (Privacy Policy)
                 </h2>
                 <ul class="list-disc list-inside space-y-1.5 text-gray-300 ml-2">
-                    <li><strong>Data Teknis:</strong> Kami mencatat metadata teknis seperti ukuran file, tipe MIME, hash SHA-256 (untuk deduplikasi file), alamat IP (untuk rate limiting dan keamanan), serta jumlah tayang (view count).</li>
+                    <li><strong>Data Teknis:</strong> Kami mencatat metadata teknis seperti ukuran file, tipe MIME, hash SHA-256 (untuk deduplikasi file), alamat IP — disimpan sebagai hash + enkripsi AES (bukan plain) untuk rate limiting dan keamanan — serta jumlah tayang (view count).</li>
                     <li><strong>Kerahasiaan:</strong> Kami tidak menjual, menyewakan, atau membagikan data log teknis Anda kepada pihak ketiga untuk kepentingan iklan.</li>
                     <li><strong>Penghapusan Mandiri:</strong> Pengunggah memiliki kontrol penuh untuk menghapus gambar mereka secara permanen menggunakan <em>Delete URL / Token</em> yang diberikan saat upload berhasil.</li>
+                    <li><strong>Retensi & Cadangan (UU PDP No. 27/2022):</strong> File yang telah dihapus atau kedaluwarsa akan segera hilang dari tautan publik (R2). Salinan cadangan terenkripsi dapat tersimpan maksimal 30 hari untuk keperluan pemulihan dan kepatuhan hukum, lalu dihapus permanen. Log penghapusan (ID file, waktu, IP hash, penghapus admin/owner) disimpan untuk keamanan dan audit — data tidak dibagikan ke pihak ketiga kecuali diminta aparat penegak hukum yang berwenang.</li>
                 </ul>
             </section>
 
@@ -137,7 +138,7 @@
                 <a href="/" class="text-gray-300 hover:text-blue-300 underline transition-colors">Beranda</a>
                 <a href="/docs" class="text-gray-300 hover:text-blue-300 underline transition-colors">API Docs</a>
                 <a href="/faq" class="text-gray-300 hover:text-blue-300 underline transition-colors">FAQ</a>
-                <a href="/status" class="text-gray-300 hover:text-blue-300 underline transition-colors">Status</a>
+                <a href="/status" class="text-gray-300 hover:text-blue-300 underline transition-colors">Status</a> · <a href="/stats" class="text-gray-300 hover:text-blue-300 underline transition-colors">Statistik</a>
                 <a href="/legal" class="text-blue-400 font-semibold underline transition-colors">Legal & Ketentuan</a>
                 <a href="/contact" class="text-gray-300 hover:text-blue-300 underline transition-colors">Kontak</a>
                 <a href="/sharex.sxcu" download="imgof.sxcu" class="text-gray-300 hover:text-blue-300 underline transition-colors">ShareX (.sxcu)</a>

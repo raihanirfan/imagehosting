@@ -8,12 +8,15 @@ CREATE TABLE IF NOT EXISTS images (
     views INTEGER DEFAULT 0,            -- Access counter
     created_at INTEGER NOT NULL,        -- Unix timestamp (milliseconds)
     drive_file_id TEXT,                 -- Google Drive file ID
-    uploader_ip TEXT,                   -- Hashed/recorded uploader IP
-    pixeldrain_id TEXT,                 -- Pixeldrain backup file ID
-    buzzheavier_id TEXT                 -- Buzzheavier backup file ID
+    uploader_ip TEXT,                   -- Hashed uploader IP
+    uploader_ip_enc TEXT,               -- Encrypted IP
+    pixeldrain_id TEXT,                 -- Pixeldrain file ID
+    buzzheavier_id TEXT,                -- Buzzheavier file ID
+    expires_at INTEGER                  -- nullable unix ms; null = permanent
 );
 
 CREATE INDEX IF NOT EXISTS idx_images_hash ON images(hash);
 CREATE INDEX IF NOT EXISTS idx_images_created_at ON images(created_at);
 CREATE INDEX IF NOT EXISTS idx_images_pixeldrain ON images(pixeldrain_id);
 CREATE INDEX IF NOT EXISTS idx_images_buzzheavier ON images(buzzheavier_id);
+CREATE INDEX IF NOT EXISTS idx_images_expires_at ON images(expires_at);

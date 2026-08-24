@@ -5,10 +5,10 @@ const publicDir = path.join(__dirname, '../public');
 const cssPath = path.join(publicDir, 'style.css');
 const css = fs.readFileSync(cssPath, 'utf8');
 
-const ASSET_VERSION = '1.1';
+const ASSET_VERSION = '1.8';
 
 // 1. Update public HTML files to ensure clean inline CSS and versioned defer JS
-const publicHtmlFiles = ['index.html', 'docs.html', 'faq.html', 'legal.html', 'contact.html', 'status.html'];
+const publicHtmlFiles = ['index.html', 'docs.html', 'faq.html', 'legal.html', 'contact.html', 'status.html', 'stats.html'];
 publicHtmlFiles.forEach(file => {
     const filePath = path.join(publicDir, file);
     if (!fs.existsSync(filePath)) return;
@@ -33,6 +33,7 @@ const faqHtml = fs.readFileSync(path.join(publicDir, 'faq.html'), 'utf8');
 const legalHtml = fs.readFileSync(path.join(publicDir, 'legal.html'), 'utf8');
 const contactHtml = fs.readFileSync(path.join(publicDir, 'contact.html'), 'utf8');
 const statusHtml = fs.readFileSync(path.join(publicDir, 'status.html'), 'utf8');
+const statsHtml = fs.readFileSync(path.join(publicDir, 'stats.html'), 'utf8');
 const manifestJson = fs.readFileSync(path.join(publicDir, 'manifest.json'), 'utf8');
 const iconSvg = fs.readFileSync(path.join(publicDir, 'icon.svg'), 'utf8');
 const appJs = fs.readFileSync(path.join(publicDir, 'app.js'), 'utf8');
@@ -53,6 +54,7 @@ const FAQ_HTML_CONTENT = ${JSON.stringify(faqHtml)};
 const DOCS_HTML_CONTENT = ${JSON.stringify(docsHtml)};
 const CONTACT_HTML_CONTENT = ${JSON.stringify(contactHtml)};
 const STATUS_HTML_CONTENT = ${JSON.stringify(statusHtml)};
+const STATS_HTML_CONTENT = ${JSON.stringify(statsHtml)};
 const MANIFEST_CONTENT = ${JSON.stringify(manifestJson)};
 const ICON_SVG_CONTENT = ${JSON.stringify(iconSvg)};
 const JS_CONTENT = ${JSON.stringify(appJs)};
@@ -272,6 +274,10 @@ frontendRoute.get('/contact', (c) => {
 
 frontendRoute.get('/status', (c) => {
     return createHtmlResponse(STATUS_HTML_CONTENT);
+});
+
+frontendRoute.get('/stats', (c) => {
+    return createHtmlResponse(STATS_HTML_CONTENT);
 });
 
 // 7. Static Assets - 1-Year Long-Term Caching with Immutable & SWR

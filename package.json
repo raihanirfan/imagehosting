@@ -6,6 +6,7 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "build:css": "tailwindcss -i ./src/style.css -o ./public/style.css --content \"./public/**/*.{html,js},./src/**/*.{ts,js}\" --minify && node scripts/update_frontend.js",
+    "backup": "powershell -ExecutionPolicy Bypass -File ./scripts/backup_d1.ps1",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {

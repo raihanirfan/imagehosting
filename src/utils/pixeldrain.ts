@@ -65,18 +65,45 @@ export async function fetchFromPixeldrain(fileId: string, apiKey?: string): Prom
     }
 }
 
-/**
- * Sends a lightweight 1-byte GET request or info check to reset Pixeldrain's 60-day inactivity timer.
- */
-export async function pingPixeldrain(fileId: string): Promise<boolean> {
+export async function deleteFromPixeldrain(fileId: string, apiKey?: string): Promise<boolean> {
     try {
+        const headers: Record<string, string> = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
+        };
+        if (apiKey) {
+            headers['Authorization'] = `Basic ${btoa(`:${apiKey}`)}`;
+        }
+        const res = await fetch(`https://pixeldrain.com/api/file/${fileId}`, {
+            method: 'DELETE',
+            headers
+        });
+        return res.ok;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Sends a dynamic range GET request to reset Pixeldrain's inactivity timer.
+ * Dynamically requests at least 64 KB or 12% of the file size to always satisfy the 10% threshold.
+ */
+export async function pingPixeldrain(fileId: string, sizeBytes?: number): Promise<boolean> {
+    try {
+        const bytesToRead = sizeBytes && sizeBytes > 0
+            ? Math.max(65536, Math.ceil(sizeBytes * 0.12))
+            : 65536;
+
         const res = await fetch(`https://pixeldrain.com/api/file/${fileId}`, {
             method: 'GET',
             headers: {
-                'Range': 'bytes=0-0',
+                'Range': `bytes=0-${bytesToRead - 1}`,
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
             }
         });
+        // Consume the tiny chunk to ensure connection closes cleanly
+        if (res.body) {
+            await res.arrayBuffer().catch(() => {});
+        }
         return res.ok || res.status === 206;
     } catch {
         return false;

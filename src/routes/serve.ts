@@ -8,6 +8,16 @@ import { Env } from '../types';
 
 const viewRoute = new Hono<{ Bindings: Env }>();
 
+const NOT_FOUND_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <rect width="100%" height="100%" fill="#0f172a"/>
+  <rect x="150" y="100" width="500" height="400" rx="16" fill="#1e293b" stroke="#334155" stroke-width="2"/>
+  <circle cx="400" cy="230" r="50" fill="#334155"/>
+  <path d="M380 210 L420 250 M420 210 L380 250" stroke="#94a3b8" stroke-width="5" stroke-linecap="round"/>
+  <text x="400" y="330" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="bold" fill="#f8fafc" text-anchor="middle">Image Not Found</text>
+  <text x="400" y="365" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#94a3b8" text-anchor="middle">This image has been deleted or does not exist</text>
+  <text x="400" y="440" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#38bdf8" text-anchor="middle">ImgOF — imgof.my.id</text>
+</svg>`;
+
 viewRoute.get('/i/:id', async (c) => {
     const rawId = c.req.param('id');
     const clientIp = c.req.header('CF-Connecting-IP') || 'anon';
@@ -22,18 +32,43 @@ viewRoute.get('/i/:id', async (c) => {
         }
     };
 
-    // 1. Check Cloudflare Edge Cache first
+    // Fetch metadata first so expiry can hide even cached hits
+    let imageRecord = await getImageById(c.env.DB, cleanId);
+    if (!imageRecord) {
+        imageRecord = await getImageById(c.env.DB, rawId);
+    }
+
+    // 2b. Expiry
+    if ((imageRecord as any)?.expires_at && (imageRecord as any).expires_at <= Date.now()) {
+        const r: any = imageRecord;
+        const cache = caches.default;
+        const origin = new URL(c.req.url).origin;
+        c.executionCtx.waitUntil((async () => {
+            await c.env.BUCKET.delete(r.id).catch(() => {});
+            // purge edge cache for all extension variants
+            const base = `${origin}/i/${r.id}`;
+            await cache.delete(new Request(base)).catch(() => {});
+            for (const ext of ['.webp','.png','.jpg','.jpeg','.gif','.svg']) {
+                await cache.delete(new Request(base + ext)).catch(() => {});
+            }
+            await cache.delete(c.req.raw as any).catch(() => {});
+        })());
+        return new Response(NOT_FOUND_SVG, {
+            status: 404,
+            headers: {
+                'Content-Type': 'image/svg+xml; charset=UTF-8',
+                'Cache-Control': 'public, max-age=60',
+                'X-Content-Type-Options': 'nosniff'
+            }
+        });
+    }
+
+    // 1. Check Cloudflare Edge Cache (only for non-expired)
     const cache = caches.default;
     const cacheResponse = await cache.match(c.req.raw);
     if (cacheResponse) {
         recordViewIfAllowed(cleanId);
         return cacheResponse;
-    }
-
-    // 2. Find metadata in D1 (try cleanId first, fallback to rawId)
-    let imageRecord = await getImageById(c.env.DB, cleanId);
-    if (!imageRecord) {
-        imageRecord = await getImageById(c.env.DB, rawId);
     }
 
     // 3. Try Drive first if record has drive_file_id and Drive is configured
@@ -94,16 +129,6 @@ viewRoute.get('/i/:id', async (c) => {
     if (!object) {
         object = await c.env.BUCKET.get(rawId);
     }
-
-const NOT_FOUND_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
-  <rect width="100%" height="100%" fill="#0f172a"/>
-  <rect x="150" y="100" width="500" height="400" rx="16" fill="#1e293b" stroke="#334155" stroke-width="2"/>
-  <circle cx="400" cy="230" r="50" fill="#334155"/>
-  <path d="M380 210 L420 250 M420 210 L380 250" stroke="#94a3b8" stroke-width="5" stroke-linecap="round"/>
-  <text x="400" y="330" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="24" font-weight="bold" fill="#f8fafc" text-anchor="middle">Image Not Found</text>
-  <text x="400" y="365" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="14" fill="#94a3b8" text-anchor="middle">This image has been deleted or does not exist</text>
-  <text x="400" y="440" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#38bdf8" text-anchor="middle">ImgOF — imgof.my.id</text>
-</svg>`;
 
     // If still not found in R2 / Drive
     if (!object) {

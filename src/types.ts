@@ -12,6 +12,8 @@ export interface Env {
     BUZZHEAVIER_API_KEY?: string;
     BLOCKED_IPS?: string;
     ALLOWED_IPS?: string;
+    TELEGRAM_BOT_TOKEN?: string;
+    TELEGRAM_CHAT_ID?: string;
 }
 
 export interface ImageRecord {
@@ -27,4 +29,6 @@ export interface ImageRecord {
     pixeldrain_id?: string | null;
     buzzheavier_id?: string | null;
     uploader_ip?: string | null;
+    uploader_ip_enc?: string | null;
+    expires_at?: number | null;
 }

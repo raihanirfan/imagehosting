@@ -10,7 +10,7 @@ export async function getImageByHash(db: D1Database, hash: string): Promise<Imag
 
 export async function createImage(db: D1Database, record: ImageRecord): Promise<void> {
     await db.prepare(
-        'INSERT INTO images (id, hash, original_name, mime_type, size_bytes, delete_token, created_at, drive_file_id, uploader_ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+        'INSERT INTO images (id, hash, original_name, mime_type, size_bytes, delete_token, created_at, drive_file_id, pixeldrain_id, buzzheavier_id, uploader_ip, uploader_ip_enc, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     )
     .bind(
         record.id,
@@ -21,7 +21,11 @@ export async function createImage(db: D1Database, record: ImageRecord): Promise<
         record.delete_token,
         record.created_at,
         record.drive_file_id || null,
-        record.uploader_ip || null
+        record.pixeldrain_id || null,
+        record.buzzheavier_id || null,
+        record.uploader_ip || null,
+        record.uploader_ip_enc || null,
+        (record as any).expires_at ?? null
     )
     .run();
 }
@@ -74,6 +78,31 @@ export async function getStorageStats(db: D1Database): Promise<StorageStats> {
         migrated_to_drive: summary?.migrated_to_drive || 0,
         pending_drive_migration: summary?.pending_drive_migration || 0,
         top_images: topImages.results || []
+    };
+}
+
+export async function getPublicStats(db: D1Database): Promise<{
+    uploads_per_day: Array<{ day: string; count: number }>;
+    storage_per_day: Array<{ day: string; gb: number }>;
+    by_type: Array<{ mime: string; count: number }>;
+    by_size: Array<{ bucket: string; count: number }>;
+}> {
+    const perDay = await db.prepare(`
+        SELECT substr(datetime(created_at/1000,'unixepoch'),1,10) as day,
+               COUNT(*) as count, COALESCE(SUM(size_bytes),0) as bytes
+        FROM images GROUP BY day ORDER BY day DESC LIMIT 30
+    `).all<{day:string;count:number;bytes:number}>();
+    const rows = (perDay.results || []).reverse();
+    const byType = await db.prepare(`SELECT mime_type as mime, COUNT(*) as count FROM images GROUP BY mime_type ORDER BY count DESC`).all<{mime:string;count:number}>();
+    const bySize = await db.prepare(`
+        SELECT CASE WHEN size_bytes<1048576 THEN '<1MB' WHEN size_bytes<5242880 THEN '1-5MB' WHEN size_bytes<10485760 THEN '5-10MB' ELSE '>10MB' END as bucket, COUNT(*) as count
+        FROM images GROUP BY bucket
+    `).all<{bucket:string;count:number}>();
+    return {
+        uploads_per_day: rows.map(r=>({day:r.day,count:r.count})),
+        storage_per_day: rows.map(r=>({day:r.day,gb:+(r.bytes/1073741824).toFixed(3)})),
+        by_type: byType.results || [],
+        by_size: bySize.results || [],
     };
 }
 

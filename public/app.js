@@ -12,6 +12,11 @@ const historySection = document.getElementById('history-section');
 const historyGrid = document.getElementById('history-grid');
 
 const HISTORY_KEY = 'imghost_history';
+const PAGE_LIMIT = 25;
+const PAGE_COUNT_KEY = 'imghost_page_count';
+
+function getPageCount(){ try{ return parseInt(sessionStorage.getItem(PAGE_COUNT_KEY)||'0',10)||0; } catch{ return 0; } }
+function incPageCount(n=1){ try{ const v=getPageCount()+n; sessionStorage.setItem(PAGE_COUNT_KEY, String(v)); return v; } catch{ return 0; } }
 
 // 3. Initialize App & Event Listeners
 document.addEventListener('DOMContentLoaded', () => {
@@ -36,19 +41,30 @@ function setupEventListeners() {
         dropzone.ondrop = (e) => {
             e.preventDefault();
             dropzone.classList.remove('border-blue-500');
-            if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files[0]);
+            if (e.dataTransfer.files.length) handleFilesList(e.dataTransfer.files);
         };
 
         fileInput.onchange = async () => {
-            if (fileInput.files.length) await handleFiles(fileInput.files[0]);
+            if (fileInput.files.length) await handleFilesList(fileInput.files);
         };
     }
 
-    // Copy buttons
+    // Copy buttons (legacy compat: new share-input)
     document.querySelectorAll('.copy-btn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             const targetId = e.currentTarget.getAttribute('data-target');
             if (targetId) copyToClipboard(targetId);
+        });
+    });
+    const shareCopy=document.getElementById('share-copy');
+    if(shareCopy) shareCopy.addEventListener('click',()=>copyToClipboard('share-input'));
+    document.querySelectorAll('.fmt-tab').forEach(t=>{
+        t.addEventListener('click',()=>{
+            document.querySelectorAll('.fmt-tab').forEach(x=>x.className='fmt-tab px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600');
+            t.className='fmt-tab px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold';
+            const f=t.dataset.fmt, si=document.getElementById('share-input');
+            const map={direct:document.getElementById('url-input')?.value||'',markdown:document.getElementById('markdown-input')?.value||'',html:document.getElementById('html-input')?.value||'',bbcode:document.getElementById('bbcode-input')?.value||''};
+            if(si) si.value=map[f]||'';
         });
     });
 
@@ -102,7 +118,7 @@ function setupEventListeners() {
                     lastModified: Date.now(),
                 });
             }
-            await handleFiles(imageFile);
+            await handleFilesList([imageFile]);
         }
     });
 
@@ -118,25 +134,113 @@ function setupEventListeners() {
 }
 
 // 4. File Processing & Compression
-async function handleFiles(file) {
-    const MAX_COMPRESSION_SIZE_BYTES = 1 * 1024 * 1024; // 1MB
-    const ALLOWED_COMPRESSION_TYPES = ['image/png', 'image/jpeg'];
-
-    let fileToUpload = file;
-
-    if (ALLOWED_COMPRESSION_TYPES.includes(file.type) && file.size > MAX_COMPRESSION_SIZE_BYTES) {
-        try {
-            const compressedFile = await resizeAndCompressImage(file, 0.8);
-            if (compressedFile) {
-                fileToUpload = compressedFile;
-            }
-        } catch (e) {
-            console.error('Client-side compression failed:', e);
-        }
+async function handleFilesList(files) {
+    const remaining = PAGE_LIMIT - getPageCount();
+    if (remaining <= 0) { if (confirm('Limit 25 uploads per page reached. Refresh now?')) location.reload(); return; }
+    let list = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (!list.length) return;
+    if (list.length > remaining) {
+        alert(`Only ${remaining} uploads left this page (limit 25). Taking first ${remaining}.`);
+        list = list.slice(0, remaining);
     }
-
-    await uploadFile(fileToUpload);
+    const MAX_COMPRESSION_SIZE_BYTES = 1 * 1024 * 1024;
+    const ALLOWED_COMPRESSION_TYPES = ['image/png', 'image/jpeg'];
+    // batch vs single
+    if (list.length === 1) {
+        let f = list[0];
+        if (ALLOWED_COMPRESSION_TYPES.includes(f.type) && f.size > MAX_COMPRESSION_SIZE_BYTES) {
+            try { const c = await resizeAndCompressImage(f, 0.8); if (c) f = c; } catch (e) {}
+        }
+        await uploadFile(f);
+        return;
+    }
+    // multi: queue sequential with progress
+    const progress = document.getElementById('upload-progress');
+    const progressFill = document.getElementById('progress-fill');
+    const progressStatus = document.getElementById('progress-status');
+    const queueEl = document.getElementById('batch-queue');
+    const results = [];
+    function copyText(t){ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t); else { const ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); } }
+    function queueRow(i, name, size, state){
+        if(!queueEl) return null;
+        queueEl.classList.remove('hidden');
+        document.getElementById('result-card')?.classList.remove('hidden');
+        let row = queueEl.querySelector(`[data-qi="${i}"]`);
+        if(!row){ row=document.createElement('div'); row.dataset.qi=i;
+            row.className='flex flex-col gap-1 text-xs bg-gray-900 border border-gray-700 rounded-lg px-2 py-2';
+            row.innerHTML=`<div class="flex items-center gap-2"><img class="q-thumb w-10 h-10 rounded object-cover bg-gray-800 shrink-0" alt=""><span class="truncate flex-1 font-mono q-name"></span><span class="q-size text-gray-400 shrink-0"></span><span class="q-state text-gray-300 shrink-0"></span><a class="q-link hidden text-blue-400 underline truncate max-w-[140px] shrink-0" target="_blank"></a></div><div class="q-fmts hidden flex gap-1 ml-12"><button data-fmt="direct" class="qfmt px-2 py-0.5 rounded bg-blue-600 text-white">Direct</button><button data-fmt="markdown" class="qfmt px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200">MD</button><button data-fmt="html" class="qfmt px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200">HTML</button><button data-fmt="bbcode" class="qfmt px-2 py-0.5 rounded bg-gray-700 hover:bg-gray-600 text-gray-200">BB</button></div>`;
+            queueEl.appendChild(row);
+        }
+        row.querySelector('.q-name').textContent=name;
+        row.querySelector('.q-size').textContent=fmtBytes(size);
+        try{ const th=row.querySelector('.q-thumb'); if(th && !th.src) { const u=URL.createObjectURL(list[i]); th.src=u; th.onload=()=>URL.revokeObjectURL(u); } }catch{}
+        return row;
+    }
+    function bindRowFmts(row, url){
+        const fmts=row.querySelector('.q-fmts'); if(!fmts) return;
+        fmts.classList.remove('hidden');
+        const lk=row.querySelector('.q-link'); lk.textContent=url; lk.href=url; lk.classList.remove('hidden');
+        const st=row.querySelector('.q-state'); st.textContent=' ✓'; st.className='q-state text-emerald-400 shrink-0';
+        fmts.querySelectorAll('.qfmt').forEach(b=>{
+            b.onclick=()=>{
+                const f=b.dataset.fmt;
+                const map={direct:url, markdown:`![Image](${url})`, html:`<img src="${url}" alt="Image" />`, bbcode:`[IMG]${url}[/IMG]`};
+                copyText(map[f]||url);
+                const old=b.textContent; b.textContent='Copied!'; setTimeout(()=>b.textContent=old==='MD'?'MD':old==='BB'?'BB':old,1200);
+            };
+        });
+    }
+    for (let i = 0; i < list.length; i++) {
+        let f = list[i];
+        const origName = list[i].name, origSize = list[i].size;
+        const row = queueRow(i, origName, origSize); row.querySelector('.q-state').textContent=' … Uploading';
+        if (ALLOWED_COMPRESSION_TYPES.includes(f.type) && f.size > MAX_COMPRESSION_SIZE_BYTES) {
+            try { const c = await resizeAndCompressImage(f, 0.8); if (c) f = c; } catch (e) {}
+        }
+        if (progressStatus) progressStatus.textContent = `Uploading ${i+1}/${list.length}...`;
+        if (progressFill) progressFill.style.width = `${Math.round((i/list.length)*80)+10}%`;
+        if (progress) progress.classList.remove('hidden');
+        try {
+            const fd = new FormData(); fd.append('file', f);
+            const sel = document.getElementById('expiry-select');
+            if (sel && sel.value) fd.append('expiry', sel.value);
+            const res = await fetch('/api/upload', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                results.push(data);
+                saveToHistory({ id: data.id, url: data.url, delete_token: data.delete_url?.split('token=')[1] || '', timestamp: Date.now() });
+                const rr = queueEl?.querySelector(`[data-qi="${i}"]`); if(rr) bindRowFmts(rr, data.url);
+            } else { const rr=queueEl?.querySelector(`[data-qi="${i}"]`); if(rr){ rr.querySelector('.q-state').textContent=' ✗ fail'; rr.querySelector('.q-state').className='q-state text-red-400 shrink-0'; } }
+        } catch (e) { console.error(e); const rr=queueEl?.querySelector(`[data-qi="${i}"]`); if(rr){ rr.querySelector('.q-state').textContent=' ✗'; rr.querySelector('.q-state').className='q-state text-red-400'; const th=rr.querySelector('.q-thumb'); if(th&&!th.src){ try{ const u=URL.createObjectURL(list[i]); th.src=u; }catch{} } } }
+    }
+    if (progress) progress.classList.add('hidden');
+    // show batch summary: last result + history
+    if (results.length === 1) showResult(results[0]);
+    else if (results.length > 1) {
+        renderHistory();
+        // show summary banner above history
+        const last = results[results.length-1];
+        showResult(last);
+        // prepend simple batch links under result card
+        const card = document.getElementById('result-card');
+        let batch = document.getElementById('batch-links');
+        if (!batch && card) {
+            batch = document.createElement('div'); batch.id = 'batch-links';
+            batch.className = 'mt-3 text-xs bg-gray-900 border border-gray-800 rounded-lg p-3 max-h-40 overflow-auto';
+            card.appendChild(batch);
+        }
+        if (batch) batch.innerHTML = `<b>${results.length} files uploaded:</b><br>` + results.map(r => `<a href="${r.url}" target="_blank" class="text-blue-400 hover:underline break-all">${r.url}</a>`).join('<br>');
+    }
+    if (results.length === 0) alert('Upload failed');
+    const done = results.length;
+    if (done) {
+        const total = incPageCount(done);
+        if (total >= PAGE_LIMIT) setTimeout(() => { if (confirm(`25 uploads done. Refresh to continue?`)) location.reload(); }, 400);
+    }
 }
+async function handleFiles(file) { return handleFilesList([file]); }
+
+async function resetAfterBatchPlaceholder() {}
 
 async function resizeAndCompressImage(file, quality = 0.8) {
     return new Promise((resolve) => {
@@ -192,6 +296,7 @@ async function resizeAndCompressImage(file, quality = 0.8) {
 
 // 5. Upload to Cloudflare Worker
 async function uploadFile(file) {
+    if (getPageCount() >= PAGE_LIMIT) { if (confirm('Limit 25 uploads per page reached. Refresh now?')) location.reload(); return; }
     const progress = document.getElementById('upload-progress');
     const progressFill = document.getElementById('progress-fill');
 
@@ -200,6 +305,9 @@ async function uploadFile(file) {
 
     const formData = new FormData();
     formData.append('file', file);
+    const expirySel = document.getElementById('expiry-select');
+    const expiryVal = expirySel ? expirySel.value : '';
+    if (expiryVal) formData.append('expiry', expiryVal);
 
     try {
         progressFill.style.width = '60%';
@@ -219,6 +327,8 @@ async function uploadFile(file) {
                 delete_token: data.delete_url?.split('token=')[1] || '',
                 timestamp: Date.now()
             });
+            incPageCount(1);
+            if (getPageCount() >= PAGE_LIMIT) setTimeout(() => { if (confirm('25 uploads done. Refresh to continue?')) location.reload(); }, 400);
 
             showResult(data);
         } else {
@@ -334,15 +444,27 @@ async function deleteHistoryItem(id, deleteToken) {
 }
 
 // 7. UI Actions & Modals
+function fmtBytes(n){ if(!n&&n!==0) return ''; if(n<1024) return n+' B'; if(n<1048576) return (n/1024).toFixed(1)+' KB'; return (n/1048576).toFixed(2)+' MB'; }
 function showResult(data) {
     dropzone.classList.add('hidden');
     resultCard.classList.remove('hidden');
 
     document.getElementById('preview-img').src = data.url;
+    const meta = document.getElementById('result-meta');
+    if (meta) {
+        const parts = [];
+        if (data.size) parts.push(fmtBytes(data.size));
+        if (data.mime_type) parts.push(data.mime_type.split('/')[1]?.toUpperCase());
+        meta.textContent = parts.join(' · ');
+    }
     document.getElementById('url-input').value = data.url;
     document.getElementById('markdown-input').value = data.markdown || `![Image](${data.url})`;
     document.getElementById('html-input').value = data.html || `<img src="${data.url}" alt="Image" />`;
     document.getElementById('bbcode-input').value = `[IMG]${data.url}[/IMG]`;
+    const si=document.getElementById('share-input'); if(si) si.value=data.url;
+    // reset tabs to Direct
+    document.querySelectorAll('.fmt-tab').forEach(x=>x.className='fmt-tab px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600');
+    document.querySelector('.fmt-tab[data-fmt="direct"]') && (document.querySelector('.fmt-tab[data-fmt="direct"]').className='fmt-tab px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold');
 
     const deleteBtn = document.getElementById('delete-btn');
     if (deleteBtn) {
@@ -372,6 +494,8 @@ function resetUI() {
     resultCard.classList.add('hidden');
     dropzone.classList.remove('hidden');
     if (fileInput) fileInput.value = '';
+    const q=document.getElementById('batch-queue'); if(q){ q.innerHTML=''; q.classList.add('hidden'); }
+    const b=document.getElementById('batch-links'); if(b) b.remove();
 }
 
 function copyToClipboard(id) {

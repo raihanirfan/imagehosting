@@ -1,9 +1,11 @@
 import { Hono } from 'hono';
-import { calculateHash, hashIp } from '../utils/hash';
+import { calculateHash, hashIp, encryptIp } from '../utils/hash';
 import { generateId, generateDeleteToken } from '../utils/nanoid';
 import { createImage, getImageByHash } from '../db/queries';
 import { checkRateLimit } from '../utils/rateLimiter';
 import { isDriveEnabled, uploadToDrive } from '../utils/drive';
+import { uploadToPixeldrain } from '../utils/pixeldrain';
+import { uploadToBuzzheavier } from '../utils/buzzheavier';
 import { detectMimeTypeFromBuffer } from '../utils/magicBytes';
 import { verifyTurnstile } from '../utils/turnstile';
 import { Env } from '../types';
@@ -43,14 +45,20 @@ function isValidRemoteUrl(urlString: string): boolean {
         const parsed = new URL(urlString);
         if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
         const host = parsed.hostname.toLowerCase();
+        // 0.0.0.0 + private/loopback/link-local + cloud metadata + ULA/link-local ipv6
         if (
             host === 'localhost' ||
             host === '127.0.0.1' ||
+            host === '0.0.0.0' ||
             host === '::1' ||
+            host === '::ffff:127.0.0.1' ||
             host.startsWith('10.') ||
             host.startsWith('192.168.') ||
             (host.startsWith('172.') && parseInt(host.split('.')[1] || '0', 10) >= 16 && parseInt(host.split('.')[1] || '0', 10) <= 31) ||
             host.startsWith('169.254.') ||
+            host.startsWith('fc') ||          // fc00::/7 ULA (fc/fd)
+            host.startsWith('fd') ||
+            host.startsWith('fe80') ||        // fe80::/10 link-local
             host.endsWith('.local') ||
             host.endsWith('.internal')
         ) {
@@ -60,6 +68,21 @@ function isValidRemoteUrl(urlString: string): boolean {
     } catch {
         return false;
     }
+}
+
+// parse expiry like 1h, 24h, 168h, 720h, 0/never, or seconds number
+function parseExpiryMs(raw: string | null): number | null {
+    if (!raw) return null;
+    const s = String(raw).trim().toLowerCase();
+    if (s === '0' || s === 'never' || s === 'permanent' || s === '') return null;
+    const m = s.match(/^(\d+)\s*(h|hour|hours|d|day|days)?$/);
+    if (m) {
+        const n = parseInt(m[1], 10);
+        const unit = (m[2] || 'h').toLowerCase();
+        if (unit.startsWith('d')) return n * 24 * 3600 * 1000;
+        return n * 3600 * 1000;
+    }
+    return null;
 }
 
 uploadRoute.post('/api/upload', async (c) => {
@@ -82,6 +105,7 @@ uploadRoute.post('/api/upload', async (c) => {
         let originalName: string = 'image.jpg';
         let remoteUrl: string | null = c.req.query('url') || null;
         let turnstileToken: string | null = (c.req.query('turnstile_token') || c.req.header('CF-Turnstile-Response')) as string || null;
+        let expiryParam: string | null = (c.req.query('expiry') || c.req.query('expires') || c.req.query('ttl')) as string || null;
 
         const contentTypeHeader = c.req.header('Content-Type') || '';
 
@@ -90,6 +114,9 @@ uploadRoute.post('/api/upload', async (c) => {
                 const jsonBody = await c.req.json();
                 if (jsonBody.url) {
                     remoteUrl = jsonBody.url;
+                }
+                if (jsonBody['expiry'] || jsonBody['expires'] || jsonBody['ttl']) {
+                    expiryParam = String(jsonBody['expiry'] || jsonBody['expires'] || jsonBody['ttl'] || '');
                 }
                 if (jsonBody['cf-turnstile-response'] || jsonBody['turnstile_token']) {
                     turnstileToken = jsonBody['cf-turnstile-response'] || jsonBody['turnstile_token'];
@@ -102,6 +129,9 @@ uploadRoute.post('/api/upload', async (c) => {
             }
             if (body['cf-turnstile-response'] || body['turnstile_token']) {
                 turnstileToken = (body['cf-turnstile-response'] || body['turnstile_token']) as string;
+            }
+            if (body['expiry'] || body['expires'] || body['ttl']) {
+                expiryParam = String(body['expiry'] || body['expires'] || body['ttl'] || '');
             }
             const file = (body['file'] || body['image']) as File;
             if (file && typeof file !== 'string') {
@@ -139,23 +169,33 @@ uploadRoute.post('/api/upload', async (c) => {
                 return c.json({ success: false, error: 'Invalid or restricted remote URL' }, 400);
             }
 
-            // Fetch directly from remote URL using Cloudflare Worker edge
+            // Fetch directly from remote URL — manual redirect to block SSRF via 302 to private IP
             const remoteRes = await fetch(remoteUrl, {
+                redirect: 'manual',
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
                 }
             });
+            // block redirects — prevents SSRF via open-redirector
+            if ([301, 302, 303, 307, 308].includes(remoteRes.status)) {
+                return c.json({ success: false, error: 'Redirect not allowed for remote URL' }, 400);
+            }
 
             if (!remoteRes.ok) {
                 return c.json({ success: false, error: `Failed to fetch remote image (HTTP ${remoteRes.status})` }, 400);
             }
 
-            mimeType = remoteRes.headers.get('Content-Type') || 'image/jpeg';
-            if (mimeType.includes(';')) {
-                mimeType = mimeType.split(';')[0].trim();
+            // pre-check Content-Length — cheap rejection before downloading huge body
+            const cl = remoteRes.headers.get('Content-Length');
+            if (cl && parseInt(cl, 10) > 10 * 1024 * 1024) {
+                return c.json({ success: false, error: 'Remote file too large (max 10 MB)' }, 413);
             }
 
             fileBuffer = await remoteRes.arrayBuffer();
+            if (fileBuffer.byteLength > 10 * 1024 * 1024) {
+                return c.json({ success: false, error: 'Remote file too large (max 10 MB)' }, 413);
+            }
+            mimeType = remoteRes.headers.get('Content-Type')?.split(';')[0].trim() || 'image/jpeg';
             const urlParts = remoteUrl.split('/');
             originalName = urlParts[urlParts.length - 1] || 'image.jpg';
         }
@@ -225,7 +265,12 @@ uploadRoute.post('/api/upload', async (c) => {
         ]);
 
         // 7. Insert record into D1
-        const record = {
+        const salt = c.env.UPLOAD_SECRET || 'imgof_salt_2026';
+        const [hashedIp, encIp] = await Promise.all([
+            clientIp ? hashIp(clientIp, salt) : Promise.resolve(null as any),
+            clientIp && clientIp !== 'anonymous' ? encryptIp(clientIp, salt).catch(() => null as any) : Promise.resolve(null as any),
+        ]);
+        const record: any = {
             id,
             hash,
             original_name: originalName,
@@ -235,9 +280,31 @@ uploadRoute.post('/api/upload', async (c) => {
             views: 0,
             created_at: Date.now(),
             drive_file_id: driveFileId,
-            uploader_ip: clientIp ? await hashIp(clientIp, c.env.UPLOAD_SECRET || 'imgof_salt_2026') : null
+            uploader_ip: hashedIp,
+            uploader_ip_enc: encIp,
+            expires_at: (() => { const ms = parseExpiryMs(expiryParam); return ms ? Date.now() + ms : null; })(),
         };
         await createImage(c.env.DB, record);
+
+        // 7b. Asynchronous Background Backup to Pixeldrain + Buzzheavier (Zero latency overhead for client)
+        if (c.executionCtx && c.executionCtx.waitUntil) {
+            c.executionCtx.waitUntil((async () => {
+                try {
+                    const [pdResult, buzzResult] = await Promise.allSettled([
+                        uploadToPixeldrain(fileBuffer, `${id}.${ext}`, c.env.PIXELDRAIN_API_KEY),
+                        uploadToBuzzheavier(fileBuffer, `${id}.${ext}`, c.env.BUZZHEAVIER_API_KEY)
+                    ]);
+                    const pd = pdResult.status === 'fulfilled' ? pdResult.value : null;
+                    const bz = buzzResult.status === 'fulfilled' ? buzzResult.value : null;
+                    if (pd?.id) await c.env.DB.prepare('UPDATE images SET pixeldrain_id = ? WHERE id = ?').bind(pd.id, id).run().catch(()=>{});
+                    if (bz?.id) await c.env.DB.prepare('UPDATE images SET buzzheavier_id = ? WHERE id = ?').bind(bz.id, id).run().catch(()=>{});
+                    if (pdResult.status === 'rejected') console.error('Background Pixeldrain upload error:', (pdResult.reason as any)?.message || pdResult.reason);
+                    if (buzzResult.status === 'rejected') console.error('Background Buzzheavier upload error:', (buzzResult.reason as any)?.message || buzzResult.reason);
+                } catch (err: any) {
+                    console.error('Background external upload error:', err?.message || err);
+                }
+            })());
+        }
 
         // 8. Return Response (201 Created)
         const imageUrl = `${origin}/i/${id}.${ext}`;

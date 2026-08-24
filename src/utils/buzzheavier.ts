@@ -60,6 +60,17 @@ export async function fetchFromBuzzheavier(fileId: string, accountId?: string): 
     }
 }
 
+export async function deleteFromBuzzheavier(fileId: string, accountId?: string): Promise<boolean> {
+    try {
+        const headers: Record<string, string> = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
+        };
+        if (accountId) headers['Authorization'] = `Bearer ${accountId}`;
+        const res = await fetch(`https://w.buzzheavier.com/${fileId}`, { method: 'DELETE', headers });
+        return res.ok;
+    } catch { return false; }
+}
+
 /**
  * Sends a lightweight 1-byte GET request (Range: bytes=0-0).
  * Registers as 1 download on Buzzheavier (+3 days retention) while transferring only 1 byte.

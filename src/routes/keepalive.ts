@@ -17,16 +17,16 @@ export async function runKeepaliveJob(db: D1Database): Promise<{
     try {
         // Query images that have Pixeldrain or Buzzheavier storage IDs
         const records = await db.prepare(`
-            SELECT id, pixeldrain_id, buzzheavier_id 
+            SELECT id, pixeldrain_id, buzzheavier_id, size_bytes 
             FROM images 
             WHERE pixeldrain_id IS NOT NULL OR buzzheavier_id IS NOT NULL
             LIMIT 200
-        `).all<{ id: string; pixeldrain_id: string | null; buzzheavier_id: string | null }>();
+        `).all<{ id: string; pixeldrain_id: string | null; buzzheavier_id: string | null; size_bytes: number }>();
 
         const items = records.results || [];
         for (const item of items) {
             if (item.pixeldrain_id) {
-                await pingPixeldrain(item.pixeldrain_id);
+                await pingPixeldrain(item.pixeldrain_id, item.size_bytes);
                 pixeldrainPinged++;
                 await sleep(150); // Polite 150ms throttle delay
             }
@@ -46,20 +46,10 @@ export async function runKeepaliveJob(db: D1Database): Promise<{
     };
 }
 
-// Manual trigger endpoint for admin
+// Manual trigger endpoint for admin — header only
 keepaliveRoute.post('/api/keepalive', async (c) => {
-    const authHeader = c.req.header('Authorization');
-    const apiKeyHeader = c.req.header('X-API-Key') || c.req.header('X-Auth-Key');
-    const tokenQuery = c.req.query('key') || c.req.query('secret');
-
-    let providedKey = apiKeyHeader || tokenQuery;
-    if (!providedKey && authHeader) {
-        if (authHeader.startsWith('Bearer ')) {
-            providedKey = authHeader.slice(7).trim();
-        } else {
-            providedKey = authHeader.trim();
-        }
-    }
+    const hdr = c.req.header('Authorization') || c.req.header('X-API-Key') || c.req.header('X-Auth-Key') || '';
+    const providedKey = hdr.startsWith('Bearer ') ? hdr.slice(7).trim() : hdr.trim() || '';
 
     const expectedSecret = c.env.UPLOAD_SECRET;
     if (!expectedSecret || providedKey !== expectedSecret) {

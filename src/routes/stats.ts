@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { getStorageStats } from '../db/queries';
+import { getStorageStats, getPublicStats } from '../db/queries';
 import { Env } from '../types';
 
 const statsRoute = new Hono<{ Bindings: Env }>();
@@ -13,11 +13,20 @@ function formatBytes(bytes: number, decimals: number = 2): string {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
 
-// 1. Safe Public Status Summary for /status page (No sensitive keys)
+// ponytail: edge cache 60s via native caches.default (zero D1 thrash from UptimeRobot pings)
 statsRoute.get('/api/status-summary', async (c) => {
+    const cache = (caches as any).default;
+    const key = new Request(c.req.url, c.req.raw);
+
+    // 1. Check Cloudflare Edge Cache First
+    const hit = await cache.match(key);
+    if (hit) {
+        return hit;
+    }
+
     try {
         const stats = await getStorageStats(c.env.DB);
-        return c.json({
+        const data = {
             success: true,
             status: 'operational',
             uptime_percent: '99.99%',
@@ -35,7 +44,17 @@ statsRoute.get('/api/status-summary', async (c) => {
                 { name: 'Database Engine (Cloudflare D1)', status: 'operational', detail: 'Low Latency SQLite' },
                 { name: 'Auto Keep-Alive Daemon', status: 'operational', detail: 'Daily Cron Scheduled' }
             ]
-        });
+        };
+
+        const res = c.json(data);
+        res.headers.set('Cache-Control', 'public, max-age=60, s-maxage=60, stale-while-revalidate=120');
+
+        // 2. Put into Edge Cache in background
+        if (c.executionCtx && c.executionCtx.waitUntil) {
+            c.executionCtx.waitUntil(cache.put(key, res.clone()));
+        }
+
+        return res;
     } catch (e: any) {
         return c.json({
             success: true,
@@ -48,20 +67,10 @@ statsRoute.get('/api/status-summary', async (c) => {
     }
 });
 
-// 2. Protected Admin Stats Endpoint
+// 2. Protected Admin Stats Endpoint — header only
 statsRoute.get('/api/stats', async (c) => {
-    const authHeader = c.req.header('Authorization');
-    const apiKeyHeader = c.req.header('X-API-Key') || c.req.header('X-Auth-Key');
-    const tokenQuery = c.req.query('key') || c.req.query('secret');
-
-    let providedKey = apiKeyHeader || tokenQuery;
-    if (!providedKey && authHeader) {
-        if (authHeader.startsWith('Bearer ')) {
-            providedKey = authHeader.slice(7).trim();
-        } else {
-            providedKey = authHeader.trim();
-        }
-    }
+    const hdr = c.req.header('Authorization') || c.req.header('X-API-Key') || c.req.header('X-Auth-Key') || '';
+    const providedKey = hdr.startsWith('Bearer ') ? hdr.slice(7).trim() : hdr.trim() || '';
 
     const expectedSecret = c.env.UPLOAD_SECRET;
     const isAdmin = expectedSecret && providedKey === expectedSecret;
@@ -104,6 +113,20 @@ statsRoute.get('/api/stats', async (c) => {
         console.error('Failed to get stats:', error);
         return c.json({ success: false, error: error.message || 'Failed to retrieve stats' }, 500);
     }
+});
+
+statsRoute.get('/api/public-stats', async (c) => {
+    const cache = (caches as any).default;
+    const key = new Request(c.req.url, c.req.raw);
+    const hit = await cache.match(key);
+    if (hit) return hit;
+    try {
+        const s = await getPublicStats(c.env.DB);
+        const res = c.json({ success: true, ...s });
+        res.headers.set('Cache-Control','public, max-age=300, s-maxage=300, stale-while-revalidate=600');
+        try { c.executionCtx.waitUntil(cache.put(key, res.clone())); } catch {}
+        return res;
+    } catch (e:any) { return c.json({success:false,error:e?.message||'err'},500); }
 });
 
 export default statsRoute;

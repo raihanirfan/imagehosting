@@ -5,11 +5,11 @@ import { getImageById } from '../db/queries';
 
 const migrateRoute = new Hono<{ Bindings: Env }>();
 
-// POST /api/migrate-to-drive?key=UPLOAD_SECRET&limit=50
-// Copies pending R2 objects to Drive, backfills D1 drive_file_id. Idempotent.
+// POST /api/migrate-to-drive?limit=50 — header Bearer only (never ?key=, avoids log leak)
 // ponytail: batch + cursor, no queue; upgrade to Queues when >10k files or needs resume across deploys
 migrateRoute.post('/api/migrate-to-drive', async (c) => {
-    const key = c.req.query('key') || c.req.header('Authorization')?.replace(/^Bearer\s+/,'') || '';
+    const hdr = c.req.header('Authorization') || c.req.header('X-API-Key') || '';
+    const key = hdr.startsWith('Bearer ') ? hdr.slice(7).trim() : hdr.trim() || '';
     if (!c.env.UPLOAD_SECRET || key !== c.env.UPLOAD_SECRET) {
         return c.json({ success: false, error: 'Unauthorized' }, 401);
     }

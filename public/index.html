@@ -35,8 +35,8 @@
         <main>
             <!-- Dropzone Form -->
             <form id="upload-form" name="image-uploader" aria-label="Image Upload Form" onsubmit="return false;">
-                <div id="dropzone" role="button" tabindex="0" aria-label="Drop images here, click to browse, or paste from clipboard" class="border-2 border-dashed border-gray-700 rounded-lg p-12 text-center cursor-pointer hover:border-blue-500 transition-colors mb-8 relative">
-                    <input type="file" id="fileInput" name="file" aria-label="Select Image File to Upload" class="hidden" accept="image/*">
+                <div id="dropzone" role="button" tabindex="0" aria-label="Drop images here, click to browse, or paste from clipboard" class="border-2 border-dashed border-gray-700 rounded-lg p-12 text-center cursor-pointer hover:border-blue-500 transition-colors mb-2 relative">
+                    <input type="file" id="fileInput" name="file" aria-label="Select Image File to Upload" class="hidden" accept="image/*" multiple>
                     <div id="dropzone-content">
                         <svg class="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
@@ -53,45 +53,39 @@
                         <p id="progress-status">Uploading...</p>
                     </div>
                 </div>
+                <div class="flex justify-end mb-6">
+                    <label for="expiry-select" class="sr-only">Expiry</label>
+                    <select id="expiry-select" class="bg-gray-800 border border-gray-700 text-gray-300 text-xs rounded-lg px-2.5 py-1.5 focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Permanent — never expires (default)</option>
+                        <option value="1h">1 hour</option>
+                        <option value="24h">24 hours</option>
+                        <option value="168h">1 week (168h)</option>
+                        <option value="720h">1 month (720h)</option>
+                    </select>
+                </div>
             </form>
 
             <!-- Result Card (Hidden by default) -->
             <div id="result-card" class="hidden bg-gray-800 rounded-lg p-6 mb-8">
+                <div id="batch-queue" class="hidden space-y-2 mb-4"></div>
                 <div class="flex flex-col md:flex-row gap-6">
                     <div class="md:w-1/3">
                         <img id="preview-img" src="" alt="Preview of uploaded image" class="rounded shadow-lg w-full object-contain max-h-64">
+                        <p id="result-meta" class="text-xs text-gray-400 mt-2 text-center"></p>
                     </div>
-                    <div class="md:w-2/3 space-y-4">
-                        <form id="result-form" name="result-form" aria-label="Image Sharing Links" onsubmit="return false;" class="space-y-4">
-                            <div>
-                                <label for="url-input" class="block text-xs font-semibold text-gray-300 uppercase mb-1">Direct Link</label>
-                                <div class="flex">
-                                    <input type="text" id="url-input" name="direct_url" aria-label="Direct Link URL" readonly class="bg-gray-700 border-none rounded-l px-3 py-2 w-full text-sm">
-                                    <button type="button" aria-label="Copy Direct Link" data-target="url-input" class="copy-btn bg-blue-600 hover:bg-blue-700 px-4 rounded-r text-sm font-semibold transition-colors">Copy</button>
-                                </div>
-                            </div>
-                            <div>
-                                <label for="markdown-input" class="block text-xs font-semibold text-gray-300 uppercase mb-1">Markdown</label>
-                                <div class="flex">
-                                    <input type="text" id="markdown-input" name="markdown_embed" aria-label="Markdown Embed Code" readonly class="bg-gray-700 border-none rounded-l px-3 py-2 w-full text-sm">
-                                    <button type="button" aria-label="Copy Markdown Code" data-target="markdown-input" class="copy-btn bg-blue-600 hover:bg-blue-700 px-4 rounded-r text-sm font-semibold transition-colors">Copy</button>
-                                </div>
-                            </div>
-                            <div>
-                                <label for="html-input" class="block text-xs font-semibold text-gray-300 uppercase mb-1">HTML Embed</label>
-                                <div class="flex">
-                                    <input type="text" id="html-input" name="html_embed" aria-label="HTML Embed Code" readonly class="bg-gray-700 border-none rounded-l px-3 py-2 w-full text-sm">
-                                    <button type="button" aria-label="Copy HTML Code" data-target="html-input" class="copy-btn bg-blue-600 hover:bg-blue-700 px-4 rounded-r text-sm font-semibold transition-colors">Copy</button>
-                                </div>
-                            </div>
-                            <div>
-                                <label for="bbcode-input" class="block text-xs font-semibold text-gray-300 uppercase mb-1">BBCode</label>
-                                <div class="flex">
-                                    <input type="text" id="bbcode-input" name="bbcode_embed" aria-label="BBCode Embed Code" readonly class="bg-gray-700 border-none rounded-l px-3 py-2 w-full text-sm">
-                                    <button type="button" aria-label="Copy BBCode" data-target="bbcode-input" class="copy-btn bg-blue-600 hover:bg-blue-700 px-4 rounded-r text-sm font-semibold transition-colors">Copy</button>
-                                </div>
-                            </div>
-                        </form>
+                    <div class="md:w-2/3 space-y-3">
+                        <div class="flex gap-1 text-xs" id="fmt-tabs">
+                            <button type="button" data-fmt="direct" class="fmt-tab px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold">Direct</button>
+                            <button type="button" data-fmt="markdown" class="fmt-tab px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600">Markdown</button>
+                            <button type="button" data-fmt="html" class="fmt-tab px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600">HTML</button>
+                            <button type="button" data-fmt="bbcode" class="fmt-tab px-3 py-1.5 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600">BBCode</button>
+                        </div>
+                        <div class="flex">
+                            <input type="text" id="share-input" readonly class="bg-gray-700 border-none rounded-l px-3 py-2 w-full text-sm font-mono">
+                            <button type="button" id="share-copy" class="bg-blue-600 hover:bg-blue-700 px-4 rounded-r text-sm font-semibold transition-colors">Copy</button>
+                        </div>
+                        <!-- keep old inputs hidden for compat -->
+                        <input type="hidden" id="url-input"><input type="hidden" id="markdown-input"><input type="hidden" id="html-input"><input type="hidden" id="bbcode-input">
                         <div class="flex flex-wrap justify-between items-center gap-3 pt-2">
                             <div class="flex items-center gap-4">
                                 <button type="button" id="qr-btn" aria-label="Open QR Code Modal" class="text-blue-400 hover:text-blue-300 text-sm font-semibold flex items-center gap-1.5 transition-colors">
@@ -126,7 +120,7 @@
             <span>&copy; 2026 ImgOF</span>
             <a href="/docs" class="text-gray-300 hover:text-blue-300 underline transition-colors">API Docs</a>
             <a href="/faq" class="text-gray-300 hover:text-blue-300 underline transition-colors">FAQ</a>
-            <a href="/status" class="text-gray-300 hover:text-blue-300 underline transition-colors">Status</a>
+            <a href="/status" class="text-gray-300 hover:text-blue-300 underline transition-colors">Status</a> · <a href="/stats" class="text-gray-300 hover:text-blue-300 underline transition-colors">Statistik</a>
             <a href="/legal" class="text-gray-300 hover:text-blue-300 underline transition-colors">Legal & Ketentuan</a>
             <a href="/contact" class="text-gray-300 hover:text-blue-300 underline transition-colors">Kontak</a>
             <a href="/sharex.sxcu" download="imgof.sxcu" class="text-gray-300 hover:text-blue-300 underline transition-colors">ShareX (.sxcu)</a>
@@ -150,6 +144,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=1.1" defer></script>
+    <script src="app.js?v=1.8" defer></script>
 </body>
 </html>

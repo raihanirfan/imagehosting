@@ -28,6 +28,8 @@ build/
 logs/
 *.sqlite
 *.db
+backups/
+backup*.sql
 
 # Sensitive Configs & Local Uploaders
 *.sxcu

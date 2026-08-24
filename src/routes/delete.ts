@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { getImageById, deleteImageRecord } from '../db/queries';
 import { checkRateLimit } from '../utils/rateLimiter';
-import { isDriveEnabled, deleteFromDrive } from '../utils/drive';
+import { notifyTelegram } from '../utils/telegram';
 import { Env } from '../types';
 
 const deleteRoute = new Hono<{ Bindings: Env }>();
@@ -81,16 +81,15 @@ deleteRoute.on(['DELETE', 'POST'], '/api/delete/:id', async (c) => {
         return c.json({ success: false, error: 'Invalid deletion token or unauthorized' }, 403);
     }
 
-    // 4. Delete file from Drive if present (best-effort)
-    if (image.drive_file_id && isDriveEnabled(c.env)) {
-        try {
-            await deleteFromDrive(c.env, image.drive_file_id);
-        } catch (e) {
-            console.error('Drive delete failed (continuing to R2):', (e as any)?.message || e);
-        }
-    }
+    // 4. R2-only delete — Drive/Pixeldrain/Buzz retained per policy (soft-delete: link mati, file eksternal tetap untuk backup/restore)
+    // ponytail: external delete via explicit admin purge only
 
-    // 4b. Delete file from R2 Bucket (retention until Drive proven; still delete both)
+    // notify telegram (non-blocking) — only if configured
+    const origin = new URL(c.req.url).origin;
+    const notifText = `🗑️ <b>Delete</b> <code>${id}</code> — ${image.original_name || 'unnamed'} (${image.mime_type}, ${(image.size_bytes/1024).toFixed(1)}KB, ${image.views} views)\n${origin}/i/${id} • by ${isMasterAdmin ? 'admin' : 'owner'} • ${clientIp}`;
+    try { c.executionCtx.waitUntil(notifyTelegram(c.env, notifText)); } catch {}
+
+    // 4b. Delete file from R2 Bucket
     await c.env.BUCKET.delete(id);
 
     // 5. Delete metadata record from D1
@@ -98,7 +97,6 @@ deleteRoute.on(['DELETE', 'POST'], '/api/delete/:id', async (c) => {
 
     // 6. Invalidate Cloudflare Edge Cache
     const cache = caches.default;
-    const origin = new URL(c.req.url).origin;
     
     // Delete base image URL from cache
     const imageUrl = `${origin}/i/${id}`;
