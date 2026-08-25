@@ -3,7 +3,7 @@ import { calculateHash, hashIp, encryptIp } from '../utils/hash';
 import { generateId, generateDeleteToken } from '../utils/nanoid';
 import { createImage, getImageByHash } from '../db/queries';
 import { checkRateLimit } from '../utils/rateLimiter';
-import { isDriveEnabled, uploadToDrive } from '../utils/drive';
+import { isDriveEnabled, uploadToDrive, getOrCreateIpFolder } from '../utils/drive';
 import { uploadToPixeldrain } from '../utils/pixeldrain';
 import { uploadToBuzzheavier } from '../utils/buzzheavier';
 import { detectMimeTypeFromBuffer } from '../utils/magicBytes';
@@ -254,10 +254,12 @@ uploadRoute.post('/api/upload', async (c) => {
         }
         const ext = getFileExtension(mimeType, originalName);
 
-        // 6. Optimized Parallel Storage: Google Drive primary + R2 fallback/retention concurrently
+        // 6. Optimized Parallel Storage: Google Drive per-IP folder + R2 concurrently
+        // ponytail: 1 extra Drive API call (getOrCreateIpFolder) per new IP, cached per-isolate
+        const ipFolderId = isDriveEnabled(c.env) ? await getOrCreateIpFolder(c.env, clientIp).catch(() => c.env.GOOGLE_FOLDER_ID || null) : null;
         const [driveFileId] = await Promise.all([
             isDriveEnabled(c.env)
-                ? uploadToDrive(c.env, fileBuffer, `${id}.${ext}`, mimeType).catch((e: any) => {
+                ? uploadToDrive(c.env, fileBuffer, `${id}.${ext}`, mimeType, ipFolderId).catch((e: any) => {
                     console.error('Drive upload failed, falling back to R2 only:', e?.message || e);
                     return null;
                 })

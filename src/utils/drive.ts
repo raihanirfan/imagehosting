@@ -3,9 +3,49 @@ import { Env } from '../types';
 // ponytail: module-level token cache, per-isolate; upgrade to KV/DO when multi-isolate thrash matters
 let cachedToken: string | null = null;
 let tokenExpiry = 0;
+const ipFolderCache = new Map<string, string>(); // ip -> folderId, per-isolate
 
 export function isDriveEnabled(env: Env): boolean {
     return !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_REFRESH_TOKEN);
+}
+
+// ponytail: per-IP subfolder under GOOGLE_FOLDER_ID for DMCA triage (raw IP name for readability, D1 keeps hash/enc for privacy). Cache per-isolate.
+export async function getOrCreateIpFolder(env: Env, clientIp: string): Promise<string | null> {
+    if (!isDriveEnabled(env) || !clientIp || clientIp === 'anonymous') return env.GOOGLE_FOLDER_ID || null;
+    const ip = clientIp.split(',')[0]!.trim();
+    if (!ip || ip === 'anonymous') return env.GOOGLE_FOLDER_ID || null;
+    if (ipFolderCache.has(ip)) return ipFolderCache.get(ip)!;
+    const token = await getAccessToken(env);
+    const parent = env.GOOGLE_FOLDER_ID || null;
+    const folderName = ip; // raw IP — Drive folder name (sanitize single-quote for query)
+    const qName = folderName.replace(/'/g, "\\'");
+    const q = parent
+        ? `mimeType='application/vnd.google-apps.folder' and name='${qName}' and '${parent}' in parents and trashed=false`
+        : `mimeType='application/vnd.google-apps.folder' and name='${qName}' and trashed=false`;
+    const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+    try {
+        const sr = await fetch(searchUrl, { headers: { Authorization: `Bearer ${token}` } });
+        if (sr.ok) {
+            const data = (await sr.json()) as any;
+            if (data.files?.[0]?.id) {
+                ipFolderCache.set(ip, data.files[0].id);
+                return data.files[0].id;
+            }
+        }
+    } catch {}
+    // create
+    try {
+        const cr = await fetch('https://www.googleapis.com/drive/v3/files?fields=id&supportsAllDrives=true', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: folderName, mimeType: 'application/vnd.google-apps.folder', ...(parent ? { parents: [parent] } : {}) }),
+        });
+        if (cr.ok) {
+            const { id } = (await cr.json()) as any;
+            if (id) { ipFolderCache.set(ip, id); return id; }
+        }
+    } catch {}
+    return parent;
 }
 
 export async function getAccessToken(env: Env): Promise<string> {
@@ -30,11 +70,12 @@ export async function getAccessToken(env: Env): Promise<string> {
     return cachedToken!;
 }
 
-export async function uploadToDrive(env: Env, buf: ArrayBuffer, name: string, mime: string): Promise<string> {
+export async function uploadToDrive(env: Env, buf: ArrayBuffer, name: string, mime: string, folderId?: string | null): Promise<string> {
     const token = await getAccessToken(env);
     const boundary = 'imgof_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    const parent = folderId ?? env.GOOGLE_FOLDER_ID ?? null;
     const metadata: any = { name };
-    if (env.GOOGLE_FOLDER_ID) metadata.parents = [env.GOOGLE_FOLDER_ID];
+    if (parent) metadata.parents = [parent];
 
     const enc = new TextEncoder();
     const header1 = enc.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n--${boundary}\r\nContent-Type: ${mime}\r\n\r\n`);
