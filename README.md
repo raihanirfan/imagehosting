@@ -48,7 +48,7 @@ graph TD
 | **Google Drive** | Durable backup | Redundancy + large-file fallback |
 | **External** | Failover (internal) | Background `waitUntil` only, not user-facing |
 
-Scale: zero servers, `compatibility_date` pinned, auto-scale per request. Assets served via `wrangler.toml [assets] not_found_handling="none"` (native CDN, no Worker overhead for static).
+Zero servers — auto-scale, static via Cloudflare CDN.
 
 ---
 
