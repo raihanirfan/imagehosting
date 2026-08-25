@@ -111,7 +111,7 @@ statsRoute.get('/api/stats', async (c) => {
         });
     } catch (error: any) {
         console.error('Failed to get stats:', error);
-        return c.json({ success: false, error: error.message || 'Failed to retrieve stats' }, 500);
+        return c.json({ success: false, error: 'Internal Server Error' }, 500);
     }
 });
 
@@ -126,7 +126,7 @@ statsRoute.get('/api/public-stats', async (c) => {
         res.headers.set('Cache-Control','public, max-age=300, s-maxage=300, stale-while-revalidate=600');
         try { c.executionCtx.waitUntil(cache.put(key, res.clone())); } catch {}
         return res;
-    } catch (e:any) { return c.json({success:false,error:e?.message||'err'},500); }
+    } catch (e:any) { console.error('Failed to get public-stats:', e); return c.json({success:false,error:'Internal Server Error'},500); }
 });
 
 export default statsRoute;
