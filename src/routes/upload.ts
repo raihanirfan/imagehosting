@@ -7,6 +7,7 @@ import { isDriveEnabled, uploadToDrive, getOrCreateIpFolder } from '../utils/dri
 import { uploadToPixeldrain } from '../utils/pixeldrain';
 import { uploadToBuzzheavier } from '../utils/buzzheavier';
 import { detectMimeTypeFromBuffer } from '../utils/magicBytes';
+import { stripExif } from '../utils/stripExif';
 import { verifyTurnstile } from '../utils/turnstile';
 import { Env } from '../types';
 
@@ -221,7 +222,12 @@ uploadRoute.post('/api/upload', async (c) => {
             }
         }
 
-        // 3. Compute SHA-256 hash of the file buffer
+        // 3. Strip EXIF (JPEG APP1) — keep Orientation, drop GPS/metadata (private: pure buffer, no sharp)
+        if (mimeType === 'image/jpeg' || mimeType === 'image/jpg') {
+            try { const stripped = stripExif(fileBuffer); if (stripped.byteLength !== fileBuffer.byteLength) fileBuffer = stripped; } catch {}
+        }
+
+        // 4. Compute SHA-256 hash of the file buffer (after strip)
         const hash = await calculateHash(fileBuffer);
 
         const origin = new URL(c.req.url).origin;
