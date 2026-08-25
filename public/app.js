@@ -370,7 +370,7 @@ function renderHistory() {
     historySection.classList.remove('hidden');
     historyGrid.innerHTML = '';
 
-    history.slice(0, 6).forEach(item => {
+    history.slice(0, 3).forEach(item => {
         const card = document.createElement('div');
         card.className = 'bg-gray-800 rounded-lg overflow-hidden border border-gray-700 hover:border-gray-500 transition-all flex flex-col group';
         card.innerHTML = `
@@ -400,8 +400,8 @@ function renderHistory() {
 
         historyGrid.appendChild(card);
     });
-    // ponytail: cap 6 on homepage, full list on /my — add "View all" when overflow
-    if (history.length > 6) {
+    // ponytail: cap 3 on homepage, full list on /my — add "View all" when overflow
+    if (history.length > 3) {
         var more=document.createElement('a'); more.href='/my'; more.className='col-span-full text-center text-xs text-white/40 hover:text-white underline mt-2 block'; more.textContent='View all '+history.length+' in My Gallery →';
         historyGrid.appendChild(more);
     }
