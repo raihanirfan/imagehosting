@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { pingPixeldrain } from '../utils/pixeldrain';
 import { pingBuzzheavier } from '../utils/buzzheavier';
+import { getAccessToken, isDriveEnabled } from '../utils/drive';
 import { Env } from '../types';
 
 const keepaliveRoute = new Hono<{ Bindings: Env }>();
@@ -45,6 +46,14 @@ export async function runKeepaliveJob(db: D1Database): Promise<{
         buzzheavier_pinged: buzzheavierPinged
     };
 }
+
+// GET /api/ping — lightweight keep-alive for UptimeRobot weekly (refreshes Drive token via waitUntil, no auth)
+keepaliveRoute.get('/api/ping', async (c) => {
+    if (isDriveEnabled(c.env)) {
+        c.executionCtx.waitUntil(getAccessToken(c.env).catch(() => {}));
+    }
+    return c.json({ success: true, ping: 'pong', ts: Date.now() }, 200, { 'Cache-Control': 'no-store' });
+});
 
 // Manual trigger endpoint for admin — header only
 keepaliveRoute.post('/api/keepalive', async (c) => {
