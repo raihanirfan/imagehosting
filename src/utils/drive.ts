@@ -9,19 +9,32 @@ export function isDriveEnabled(env: Env): boolean {
     return !!(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET && env.GOOGLE_REFRESH_TOKEN);
 }
 
-// ponytail: per-IP subfolder under GOOGLE_FOLDER_ID for DMCA triage (raw IP name for readability, D1 keeps hash/enc for privacy). Cache per-isolate.
+// ponytail: per-IP subfolder sharded by /24 (GOOGLE_FOLDER_ID/203.0.113.0_24/203.0.113.45) for >1k IPs. Cache per-isolate. IPv6 -> no shard, raw ip.
 export async function getOrCreateIpFolder(env: Env, clientIp: string): Promise<string | null> {
     if (!isDriveEnabled(env) || !clientIp || clientIp === 'anonymous') return env.GOOGLE_FOLDER_ID || null;
     const ip = clientIp.split(',')[0]!.trim();
     if (!ip || ip === 'anonymous') return env.GOOGLE_FOLDER_ID || null;
     if (ipFolderCache.has(ip)) return ipFolderCache.get(ip)!;
     const token = await getAccessToken(env);
-    const parent = env.GOOGLE_FOLDER_ID || null;
-    const folderName = ip; // raw IP — Drive folder name (sanitize single-quote for query)
+    const root = env.GOOGLE_FOLDER_ID || null;
+    const isV4 = /^\d+\.\d+\.\d+\.\d+$/.test(ip);
+    let parentId = root;
+    if (isV4) {
+        const shard = ip.split('.').slice(0, 3).join('.') + '.0_24';
+        const qShard = shard.replace(/'/g, "\\'");
+        const q1 = root ? `mimeType='application/vnd.google-apps.folder' and name='${qShard}' and '${root}' in parents and trashed=false` : `mimeType='application/vnd.google-apps.folder' and name='${qShard}' and trashed=false`;
+        const u1 = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q1)}&fields=files(id)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+        try {
+            const r = await fetch(u1, { headers: { Authorization: `Bearer ${token}` } });
+            if (r.ok) { const d = (await r.json()) as any; if (d.files?.[0]?.id) parentId = d.files[0].id; else {
+                const cr = await fetch('https://www.googleapis.com/drive/v3/files?fields=id&supportsAllDrives=true', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: shard, mimeType: 'application/vnd.google-apps.folder', ...(root ? { parents: [root] } : {}) }) });
+                if (cr.ok) { const { id } = (await cr.json()) as any; if (id) parentId = id; }
+            }}
+        } catch {}
+    }
+    const folderName = ip;
     const qName = folderName.replace(/'/g, "\\'");
-    const q = parent
-        ? `mimeType='application/vnd.google-apps.folder' and name='${qName}' and '${parent}' in parents and trashed=false`
-        : `mimeType='application/vnd.google-apps.folder' and name='${qName}' and trashed=false`;
+    const q = parentId ? `mimeType='application/vnd.google-apps.folder' and name='${qName}' and '${parentId}' in parents and trashed=false` : `mimeType='application/vnd.google-apps.folder' and name='${qName}' and trashed=false`;
     const searchUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=1&supportsAllDrives=true&includeItemsFromAllDrives=true`;
     try {
         const sr = await fetch(searchUrl, { headers: { Authorization: `Bearer ${token}` } });
@@ -38,14 +51,14 @@ export async function getOrCreateIpFolder(env: Env, clientIp: string): Promise<s
         const cr = await fetch('https://www.googleapis.com/drive/v3/files?fields=id&supportsAllDrives=true', {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: folderName, mimeType: 'application/vnd.google-apps.folder', ...(parent ? { parents: [parent] } : {}) }),
+            body: JSON.stringify({ name: folderName, mimeType: 'application/vnd.google-apps.folder', ...(parentId ? { parents: [parentId] } : {}) }),
         });
         if (cr.ok) {
             const { id } = (await cr.json()) as any;
             if (id) { ipFolderCache.set(ip, id); return id; }
         }
     } catch {}
-    return parent;
+    return parentId;
 }
 
 export async function getAccessToken(env: Env): Promise<string> {
