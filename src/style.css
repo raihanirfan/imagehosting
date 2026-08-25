@@ -2,6 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ui-motion T1 — Silk/Snap/Spring -> CSS native (no framer-motion), ponytail: one block, per-card stagger, respects prefers-reduced-motion */
+@media (prefers-reduced-motion: no-preference) {
+  #dropzone{transition:transform .22s cubic-bezier(.16,1,.3,1), border-color .2s, box-shadow .22s, background-color .2s}
+  #dropzone:hover{transform:translateY(-1px); box-shadow:0 10px 28px rgba(0,0,0,.22)}
+  #dropzone:active{transform:scale(.985)}
+  #url-upload-btn,#gallery-copy-btn,#gallery-del-sel-btn,#gallery-clear-btn,#clear-history-btn,#gallery-select-all{transition:transform .16s cubic-bezier(.34,1.56,.64,1), background-color .16s, opacity .16s, box-shadow .16s}
+  #url-upload-btn:hover,#gallery-copy-btn:hover{transform:translateY(-1px); box-shadow:0 6px 16px rgba(0,0,0,.2)}
+  #url-upload-btn:active,#gallery-copy-btn:active,#gallery-del-sel-btn:active{transform:scale(.96)}
+  @keyframes ui-enter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  #history-grid>div,#gallery-grid>div{animation:ui-enter .42s cubic-bezier(.16,1,.3,1) both; transition:transform .2s cubic-bezier(.16,1,.3,1), box-shadow .2s, border-color .2s}
+  #history-grid>div:nth-child(1),#gallery-grid>div:nth-child(1){animation-delay:.02s}
+  #history-grid>div:nth-child(2),#gallery-grid>div:nth-child(2){animation-delay:.08s}
+  #history-grid>div:nth-child(3),#gallery-grid>div:nth-child(3){animation-delay:.14s}
+  #history-grid>div:nth-child(4),#gallery-grid>div:nth-child(4){animation-delay:.2s}
+  #history-grid>div:nth-child(5),#gallery-grid>div:nth-child(5){animation-delay:.26s}
+  #history-grid>div:nth-child(6),#gallery-grid>div:nth-child(6){animation-delay:.32s}
+  #history-grid>div:hover,#gallery-grid>div:hover{transform:translateY(-2px); box-shadow:0 10px 24px rgba(0,0,0,.28)}
+  /* T2 — queue pop-in + progress shimmer */
+  @keyframes ui-pop{0%{opacity:0;transform:scale(.94) translateY(6px)}60%{opacity:1;transform:scale(1.015) translateY(0)}100%{opacity:1;transform:scale(1)}}
+  #batch-queue>div{animation:ui-pop .38s cubic-bezier(.34,1.56,.64,1) both}
+  #progress-fill{position:relative; overflow:hidden}
+  #progress-fill::after{content:""; position:absolute; inset:0; transform:translateX(-100%); background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent); animation:ui-shimmer 1.1s linear infinite}
+  @keyframes ui-shimmer{to{transform:translateX(100%)}}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms !important; animation-iteration-count:1 !important; transition-duration:.01ms !important}
+}
+
 ::-webkit-scrollbar {
     width: 8px;
 }
