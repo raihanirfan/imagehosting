@@ -5,7 +5,7 @@ const cssPath = path.join(publicDir, 'style.css');
 const css = fs.readFileSync(cssPath, 'utf8');
 const ASSET_VERSION = '2.5';
 // 1. Update public HTML files to ensure clean inline CSS and versioned defer JS
-const publicHtmlFiles = ['index.html', 'my.html', 'docs.html', 'faq.html', 'legal.html', 'contact.html', 'status.html', 'stats.html'];
+const publicHtmlFiles = ['index.html', 'about.html', 'my.html', 'docs.html', 'faq.html', 'legal.html', 'contact.html', 'status.html', 'stats.html'];
 publicHtmlFiles.forEach(file => {
     const filePath = path.join(publicDir, file);
     if (!fs.existsSync(filePath)) return;
@@ -19,6 +19,7 @@ publicHtmlFiles.forEach(file => {
 });
 // 2. Read all static files
 const indexHtml = fs.readFileSync(path.join(publicDir, 'index.html'), 'utf8');
+const aboutHtml = fs.readFileSync(path.join(publicDir, 'about.html'), 'utf8');
 const docsHtml = fs.readFileSync(path.join(publicDir, 'docs.html'), 'utf8');
 const faqHtml = fs.readFileSync(path.join(publicDir, 'faq.html'), 'utf8');
 const legalHtml = fs.readFileSync(path.join(publicDir, 'legal.html'), 'utf8');
@@ -35,6 +36,7 @@ import { Env } from '../types';
 const frontendRoute = new Hono<{ Bindings: Env }>();
 
 const HTML_CONTENT = ${JSON.stringify(indexHtml)};
+const ABOUT_HTML_CONTENT = ${JSON.stringify(aboutHtml)};
 const LEGAL_HTML_CONTENT = ${JSON.stringify(legalHtml)};
 const FAQ_HTML_CONTENT = ${JSON.stringify(faqHtml)};
 const DOCS_HTML_CONTENT = ${JSON.stringify(docsHtml)};
@@ -88,7 +90,7 @@ frontendRoute.get('/llms.txt', (c) => {
 
 frontendRoute.get('/sitemap.xml', function(c) {
     var origin = new URL(c.req.url).origin;
-    var pages = ['', '/legal', '/faq', '/docs', '/contact', '/status', '/stats', '/my'];
+    var pages = ['', '/about', '/legal', '/faq', '/docs', '/contact', '/status', '/stats', '/my'];
     var now = new Date().toISOString();
     var urls = pages.map(function(p) { return '  <url><loc>' + origin + (p || '/') + '</loc><lastmod>' + now + '</lastmod></url>'; }).join(String.fromCharCode(10));
     var xml = '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' + String.fromCharCode(10) + urls + String.fromCharCode(10) + '</urlset>';
@@ -219,6 +221,10 @@ frontendRoute.get('/v/:id', async (c) => {
 // 5. Web UI Routes with Optimized Cache-Control
 frontendRoute.get('/', (c) => {
     return createHtmlResponse(HTML_CONTENT);
+});
+
+frontendRoute.get('/about', (c) => {
+    return createHtmlResponse(ABOUT_HTML_CONTENT);
 });
 
 frontendRoute.get('/legal', (c) => {
