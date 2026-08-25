@@ -28,6 +28,7 @@ function setupEventListeners() {
     // Dropzone & File Input
     if (dropzone && fileInput) {
         dropzone.onclick = () => fileInput.click();
+        dropzone.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); } };
 
         dropzone.ondragover = (e) => {
             e.preventDefault();
@@ -376,10 +377,10 @@ function renderHistory() {
             <div class="relative aspect-video bg-gray-950 flex items-center justify-center overflow-hidden">
                 <img alt="Thumbnail" class="hist-thumb object-cover w-full h-full group-hover:scale-105 transition-transform duration-300">
                 <div class="absolute inset-0 bg-black bg-opacity-40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                    <button class="hist-view-btn bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full transition-colors text-xs" title="View Direct Link">
+                    <button class="hist-view-btn bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-full transition-colors text-xs" aria-label="View image" title="View Direct Link">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
                     </button>
-                    <button class="hist-del-btn bg-red-600 hover:bg-red-700 text-white p-2 rounded-full transition-colors text-xs" title="Delete permanently">
+                    <button class="hist-del-btn bg-red-600 hover:bg-red-700 text-white p-2 rounded-full transition-colors text-xs" aria-label="Delete image" title="Delete permanently">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                     </button>
                 </div>
@@ -493,7 +494,7 @@ function renderGallery() {
     history.forEach(function(item){
         const card = document.createElement('div');
         card.className = 'bg-white/[0.04] border border-white/10 rounded-2xl overflow-hidden flex flex-col';
-        card.innerHTML = '<div class="relative aspect-square bg-white/[0.02] flex items-center justify-center overflow-hidden"><input type="checkbox" class="g-chk absolute top-2 left-2 w-4 h-4 accent-white"><img class="g-thumb w-full h-full object-cover" alt=""><div class="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2"><a class="g-view bg-white text-black text-xs px-3 py-1.5 rounded-full font-medium" target="_blank">Open</a><button class="g-del bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-full">Delete</button></div></div><div class="p-3"><div class="flex items-center justify-between gap-2"><span class="g-id font-mono text-xs truncate text-white/70"></span><span class="g-date text-[11px] text-white/30 shrink-0"></span></div><div class="g-fmts flex gap-1.5 mt-2 flex-wrap"></div></div>';
+        card.innerHTML = '<div class="relative aspect-square bg-white/[0.02] flex items-center justify-center overflow-hidden"><input type="checkbox" class="g-chk absolute top-2 left-2 w-4 h-4 accent-white" aria-label="Select image"><img class="g-thumb w-full h-full object-cover" alt=""><div class="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2"><a aria-label="Open image" class="g-view bg-white text-black text-xs px-3 py-1.5 rounded-full font-medium" target="_blank">Open</a><button aria-label="Delete image" class="g-del bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-full">Delete</button></div></div><div class="p-3"><div class="flex items-center justify-between gap-2"><span class="g-id font-mono text-xs truncate text-white/70"></span><span class="g-date text-[11px] text-white/30 shrink-0"></span></div><div class="g-fmts flex gap-1.5 mt-2 flex-wrap"></div></div>';
         const thumb = card.querySelector('.g-thumb'); thumb.src = item.url;
         var chk = card.querySelector('.g-chk'); chk.onchange=function(){ if(this.checked) selected.add(item.id); else selected.delete(item.id); refreshSelUI(); };
         card.querySelector('.g-id').textContent = item.id;
