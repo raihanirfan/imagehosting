@@ -262,6 +262,26 @@ frontendRoute.get('/stats', (c) => {
 });
 
 // 7. Static Assets - 1-Year Long-Term Caching with Immutable & SWR
+frontendRoute.get('/openapi.json', (c) => {
+    const origin = new URL(c.req.url).origin;
+    const spec = {
+        openapi: '3.0.3',
+        info: { title: 'ImgOF API', version: '1.0.0', description: 'Ultrafast image hosting — imgof.my.id', contact: { email: 'admin@imgof.my.id' } },
+        servers: [{ url: origin }],
+        paths: {
+            '/api/upload': { post: { summary: 'Upload image', operationId: 'uploadImage', responses: { '201': { description: 'Created' } } } },
+            '/api/v1/images': { post: { summary: 'Upload image (v1 alias)', operationId: 'v1UploadImage', responses: { '201': { description: 'Created' } } } },
+            '/api/v1/images/{id}': { get: { summary: 'Get image metadata', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'OK' } } }, delete: { summary: 'Delete image', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Deleted' } } } },
+            '/api/info/{id}': { get: { summary: 'Get image metadata (legacy)', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'OK' } } } },
+            '/api/delete/{id}': { delete: { summary: 'Delete image (legacy)', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Deleted' } } } },
+            '/i/{id}': { get: { summary: 'Serve image binary', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { '200': { description: 'Image bytes' } } } },
+            '/api/public-stats': { get: { summary: 'Public stats', responses: { '200': { description: 'OK' } } } },
+            '/api/status-summary': { get: { summary: 'Status summary', responses: { '200': { description: 'OK' } } } },
+        },
+    } as any;
+    return c.json(spec, 200, { 'Cache-Control': 'public, max-age=3600', 'Access-Control-Allow-Origin': '*' } as any);
+});
+
 frontendRoute.get('/app.js', (c) => {
     return new Response(JS_CONTENT, {
         headers: {
