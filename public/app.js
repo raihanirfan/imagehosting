@@ -411,8 +411,8 @@ async function deleteHistoryItem(id, deleteToken) {
     if (!confirm('Are you sure you want to delete this image permanently from the server?')) return;
 
     try {
-        const deleteUrl = `/api/delete/${id}?token=${deleteToken}`;
-        const response = await fetch(deleteUrl, { method: 'DELETE' });
+        const deleteUrl = `/api/delete/${id}`;
+        const response = await fetch(deleteUrl, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + deleteToken } });
         const result = await response.json();
         if (result.success) {
             alert('Image deleted successfully.');
@@ -490,7 +490,7 @@ function renderGallery() {
     function refreshSelUI(){ if(selCount) selCount.textContent=selected.size+' selected'; if(selAll) selAll.checked=selected.size>0 && selected.size===history.length; }
     if(selAll) selAll.onchange=function(){ selected.clear(); if(this.checked) history.forEach(function(h){selected.add(h.id)}); grid.querySelectorAll('.g-chk').forEach(function(c){c.checked=selAll.checked}); refreshSelUI(); };
     if(copyBtn) copyBtn.onclick=function(){ if(selected.size===0){ copyBtn.textContent='Select images first'; setTimeout(function(){copyBtn.textContent='Copy links'},1200); return; } var fmt=copyFmt?copyFmt.value:'direct'; var lines=[]; history.forEach(function(h){ if(!selected.has(h.id)) return; var u=h.url; var v= fmt==='md' ? '!['+h.id+']('+u+')' : fmt==='html' ? '<img src="'+u+'" alt="'+h.id+'" />' : fmt==='bb' ? '[IMG]'+u+'[/IMG]' : u; lines.push(v); }); copyText(lines.join('\n')); var old=copyBtn.textContent; copyBtn.textContent='Copied '+lines.length+'!'; setTimeout(function(){copyBtn.textContent=old},1200); };
-    if(delSelBtn) delSelBtn.onclick=async function(){ if(selected.size===0) return; if(!confirm('Delete '+selected.size+' selected images permanently?')) return; var ids=[...selected]; for(var j=0;j<ids.length;j++){ var h=history.find(function(x){return x.id===ids[j]}); if(!h) continue; try{ var r=await fetch('/api/delete/'+h.id+'?token='+encodeURIComponent(h.delete_token),{method:'DELETE'}); var js=await r.json(); if(js.success) removeFromHistory(h.id); }catch(e){} } selected.clear(); refreshSelUI(); renderGallery(); };
+    if(delSelBtn) delSelBtn.onclick=async function(){ if(selected.size===0) return; if(!confirm('Delete '+selected.size+' selected images permanently?')) return; var ids=[...selected]; for(var j=0;j<ids.length;j++){ var h=history.find(function(x){return x.id===ids[j]}); if(!h) continue; try{ var r=await fetch('/api/delete/'+h.id,{method:'DELETE',headers:{'Authorization':'Bearer '+h.delete_token}}); var js=await r.json(); if(js.success) removeFromHistory(h.id); }catch(e){} } selected.clear(); refreshSelUI(); renderGallery(); };
     history.forEach(function(item){
         const card = document.createElement('div');
         card.className = 'bg-white/[0.04] border border-white/10 rounded-2xl overflow-hidden flex flex-col';
