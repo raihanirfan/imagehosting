@@ -65,7 +65,7 @@ Zero servers — auto-scale, static via Cloudflare CDN.
 - ⏱️ **Expiry** — `?expires=1h|24h|1w|1m|permanent` → soft-delete + 30-day encrypted backup retention (PDP §6).
 - ♿ **A11y + DX** — WCAG/ARIA, keyboard nav, `llms.txt` + `WebMCP` forms, `ShareX` 1-click (`/sharex.sxcu`).
 - 🔔 **Ops** — Telegram deploy/DMCA alerts (`TELEGRAM_BOT_TOKEN`), Daily Cron `0 0 * * *` keepalive ping.
-- 🧹 **Privacy ops** — `EXIF GPS` strip keeps only `Orientation 0x0112`; `DELETE` is R2-only (Drive retained for recovery).
+- 🧹 **Privacy ops** — EXIF location stripped (orientation kept); deletes remove public link immediately, backups purged after 30 days.
 
 ---
 
