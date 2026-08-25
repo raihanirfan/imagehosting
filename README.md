@@ -143,8 +143,7 @@ npm run deploy                   # wrangler deploy (needs CLOUDFLARE_API_TOKEN)
 | `UPLOAD_SECRET` | optional | Extra upload guard |
 | `TURNSTILE_SECRET_KEY` | optional | CAPTCHA verify |
 | `GOOGLE_*` (4) | for Drive | `CLIENT_ID`, `CLIENT_SECRET`, `REFRESH_TOKEN`, `FOLDER_ID` |
-| `PIXELDRAIN_API_KEY` | internal | Failover (not shown in public copy) |
-| `BUZZHEAVIER_API_KEY` | internal | Failover (not shown in public copy) |
+| `PIXELDRAIN_API_KEY` / `BUZZHEAVIER_API_KEY` | optional | External failover backup (internal) |
 | `TELEGRAM_BOT_TOKEN` / `CHAT_ID` | optional | Alerts |
 | `ALLOWED_IPS` / `BLOCKED_IPS` | optional | ACL |
 
