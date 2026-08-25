@@ -64,6 +64,8 @@ graph TD
 | `/faq` | `GET` | Frequently Asked Questions & ShareX guide |
 | `/status` | `GET` | Real-time edge service health & operational status |
 | `/stats` | `GET` | Visual analytics & public upload statistics |
+| `/about` | `GET` | Tentang ImgOF — hosting anonim, teknologi & batasan |
+| `/my` | `GET` | Galeri lokal perangkat — riwayat upload, copy & delete |
 | `/contact` | `GET` | Official support, abuse reporting, and feedback center |
 | `/legal` | `GET` | Terms of Service, Acceptable Use, and Privacy Policy |
 | `/llms.txt` | `GET` | Standardized documentation for AI agents |
