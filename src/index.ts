@@ -124,7 +124,8 @@ app.get('/api/admin/ip/:id', async (c) => {
         const ip = await decryptIp(row.uploader_ip_enc, secret);
         return c.json({ success: true, id, uploader_ip: ip, uploader_ip_hash: row.uploader_ip });
     } catch (e: any) {
-        return c.json({ success: false, error: e?.message || 'decrypt failed' }, 500);
+        console.error('decryptIp failed:', e?.message || e);
+        return c.json({ success: false, error: 'decrypt failed' }, 500);
     }
 });
 
@@ -179,9 +180,12 @@ app.get('/api/v1/images/:id', async (c) => {
 });
 app.on(['DELETE', 'POST'], '/api/v1/images/:id', (c) => {
     const id = c.req.param('id');
+    // v1 header-only: drop ?token in URL leak — token via Authorization/X-API-Key/body only
     const url = new URL(c.req.url);
     url.pathname = `/api/delete/${id}`;
-    url.search = new URL(c.req.url).search;
+    url.searchParams.delete('token'); url.searchParams.delete('secret'); url.searchParams.delete('key');
+    const qs = url.searchParams.toString();
+    url.search = qs ? `?${qs}` : '';
     return deleteRoute.fetch(new Request(url.toString(), c.req.raw as any), c.env, c.executionCtx as any);
 });
 
