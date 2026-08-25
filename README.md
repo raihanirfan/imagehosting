@@ -33,12 +33,12 @@
 
 ```mermaid
 graph TD
-    Client[📱 Browser / ShareX / curl] -->|Upload / View| Edge[⚡ Cloudflare Edge]
-    Edge --> Worker[⚙️ Worker (Hono) + Security]
-    Worker -->|metadata + IP ACL| D1[(🗄️ D1 SQLite)]
-    Worker -->|Tier 1 hot cache| R2[(📦 R2)]
-    Worker -->|Tier 2 durable backup| GDrive[(📁 Google Drive)]
-    Worker -.->|waitUntil backup| Cold[(☁️ External Failover)]
+    Client["📱 Browser / ShareX / curl"] -->|Upload / View| Edge["⚡ Cloudflare Edge"]
+    Edge --> Worker["⚙️ Worker Hono + Security"]
+    Worker -->|metadata + IP ACL| D1[("🗄️ D1 SQLite")]
+    Worker -->|Tier 1 hot cache| R2[("📦 R2")]
+    Worker -->|Tier 2 durable backup| GDrive[("📁 Google Drive")]
+    Worker -.->|waitUntil backup| Cold[("☁️ External Failover")]
     Edge -.->|Cache-Control immutable| Client
 ```
 
