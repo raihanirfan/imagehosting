@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    <linearGradient id="primaryGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#60a5fa" />
+      <stop offset="100%" stop-color="#818cf8" />
+    </linearGradient>
+  </defs>
+  
+  <!-- App Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)" stroke="#334155" stroke-width="8" />
+  
+  <!-- Camera / Image Frame Outline -->
+  <rect x="96" y="128" width="320" height="256" rx="36" fill="#1e293b" stroke="url(#primaryGrad)" stroke-width="14" />
+  
+  <!-- Sun / Aperture -->
+  <circle cx="180" cy="210" r="32" fill="url(#primaryGrad)" />
+  
+  <!-- Modern Mountains / Picture Vector -->
+  <path d="M120 340 L210 245 C220 235 236 235 246 245 L320 320" fill="none" stroke="url(#accentGrad)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M280 340 L330 285 C340 275 356 275 366 285 L392 315" fill="none" stroke="url(#primaryGrad)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" />
+  
+  <!-- Flash Dot -->
+  <circle cx="360" cy="175" r="14" fill="#38bdf8" />
+</svg>
