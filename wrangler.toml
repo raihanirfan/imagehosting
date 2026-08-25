@@ -28,3 +28,7 @@ zone_name = "imgof.my.id"
 [[routes]]
 pattern = "www.imgof.my.id/*"
 zone_name = "imgof.my.id"
+
+[assets]
+directory = "./public"
+not_found_handling = "none"
