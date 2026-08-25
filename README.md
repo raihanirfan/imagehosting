@@ -26,7 +26,7 @@
 
 - **Zero friction** — no account, no email. Upload → copy link in < 1s.
 - **Fast everywhere** — 330+ Cloudflare edge PoPs, `immutable` 1-year CDN cache.
-- **Private by default** — no analytics, no ads. IP stored as `hash+AES`, EXIF GPS auto-stripped.
+- **Private by default** — no analytics, no ads. IP encrypted at rest, EXIF GPS auto-stripped.
 - **Yours to delete** — every upload returns a `delete_token`. Also in `localStorage` at `/my`.
 
 ## 🏗️ Architecture
