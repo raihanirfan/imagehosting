@@ -163,6 +163,28 @@ app.post('/api/admin/unlock/:id', async (c) => {
     return c.json({ success: true, id, locked: false });
 });
 
+// v1 aliases — REST nouns (api-design-principles) — forwarding to single handler, legacy /api/* tetap hidup
+// ponytail: one-file alias, no handler duplication; 204 for DELETE v1 when client ready (now 200 for compat)
+app.post('/api/v1/images', (c) => {
+    const url = new URL(c.req.url);
+    url.pathname = '/api/upload';
+    return uploadRoute.fetch(new Request(url.toString(), c.req.raw as any), c.env, c.executionCtx as any);
+});
+app.get('/api/v1/images/:id', async (c) => {
+    const id = c.req.param('id');
+    const record = await getImageById(c.env.DB, id) as any;
+    if (!record) return c.json({ success: false, error: 'Not found' }, 404);
+    const { delete_token, uploader_ip, uploader_ip_enc, expires_at, ...publicData } = record as any;
+    return c.json(publicData);
+});
+app.on(['DELETE', 'POST'], '/api/v1/images/:id', (c) => {
+    const id = c.req.param('id');
+    const url = new URL(c.req.url);
+    url.pathname = `/api/delete/${id}`;
+    url.search = new URL(c.req.url).search;
+    return deleteRoute.fetch(new Request(url.toString(), c.req.raw as any), c.env, c.executionCtx as any);
+});
+
 // Fallback 404 for unhandled routes
 app.get('/.well-known/security.txt', (c) => c.text(
     'Contact: mailto:admin@imgof.my.id\n' +
