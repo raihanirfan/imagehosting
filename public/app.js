@@ -477,6 +477,9 @@ function renderGallery() {
     var copyBtn = document.getElementById('gallery-copy-btn');
     var copyFmt = document.getElementById('gallery-copy-fmt');
     var delSelBtn = document.getElementById('gallery-del-sel-btn');
+    var searchInput = document.getElementById('gallery-search');
+    var q = (searchInput ? searchInput.value.trim().toLowerCase() : '');
+    function matchesSearch(item){ return !q || item.id.toLowerCase().includes(q); }
     if (toolbar) toolbar.classList.toggle('hidden', history.length === 0);
     if (history.length === 0) {
         grid.innerHTML = '';
@@ -491,7 +494,9 @@ function renderGallery() {
     if(selAll) selAll.onchange=function(){ selected.clear(); if(this.checked) history.forEach(function(h){selected.add(h.id)}); grid.querySelectorAll('.g-chk').forEach(function(c){c.checked=selAll.checked}); refreshSelUI(); };
     if(copyBtn) copyBtn.onclick=function(){ if(selected.size===0){ copyBtn.textContent='Select images first'; setTimeout(function(){copyBtn.textContent='Copy links'},1200); return; } var fmt=copyFmt?copyFmt.value:'direct'; var lines=[]; history.forEach(function(h){ if(!selected.has(h.id)) return; var u=h.url; var v= fmt==='md' ? '!['+h.id+']('+u+')' : fmt==='html' ? '<img src="'+u+'" alt="'+h.id+'" />' : fmt==='bb' ? '[IMG]'+u+'[/IMG]' : u; lines.push(v); }); copyText(lines.join('\n')); var old=copyBtn.textContent; copyBtn.textContent='Copied '+lines.length+'!'; setTimeout(function(){copyBtn.textContent=old},1200); };
     if(delSelBtn) delSelBtn.onclick=async function(){ if(selected.size===0) return; if(!confirm('Delete '+selected.size+' selected images permanently?')) return; var ids=[...selected]; for(var j=0;j<ids.length;j++){ var h=history.find(function(x){return x.id===ids[j]}); if(!h) continue; try{ var r=await fetch('/api/delete/'+h.id,{method:'DELETE',headers:{'Authorization':'Bearer '+h.delete_token}}); var js=await r.json(); if(js.success) removeFromHistory(h.id); }catch(e){} } selected.clear(); refreshSelUI(); renderGallery(); };
+    if (searchInput && !searchInput._bound) { searchInput._bound = true; searchInput.addEventListener('input', renderGallery); }
     history.forEach(function(item){
+        if (!matchesSearch(item)) return;
         const card = document.createElement('div');
         card.className = 'bg-white/[0.04] border border-white/10 rounded-2xl overflow-hidden flex flex-col';
         card.innerHTML = '<div class="relative aspect-square bg-white/[0.02] flex items-center justify-center overflow-hidden"><input type="checkbox" class="g-chk absolute top-2 left-2 w-4 h-4 accent-white" aria-label="Select image"><img class="g-thumb w-full h-full object-cover" alt=""><div class="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center gap-2"><a aria-label="Open image" class="g-view bg-white text-black text-xs px-3 py-1.5 rounded-full font-medium" target="_blank">Open</a><button aria-label="Delete image" class="g-del bg-red-600 hover:bg-red-700 text-white text-xs px-3 py-1.5 rounded-full">Delete</button></div></div><div class="p-3"><div class="flex items-center justify-between gap-2"><span class="g-id font-mono text-xs truncate text-white/70"></span><span class="g-date text-[11px] text-white/30 shrink-0"></span></div><div class="g-fmts flex gap-1.5 mt-2 flex-wrap"></div></div>';
