@@ -92,9 +92,8 @@ uploadRoute.post('/api/upload', async (c) => {
     try {
         const authHeader = c.req.header('Authorization');
         const apiKeyHeader = c.req.header('X-API-Key') || c.req.header('X-Auth-Key');
-        const tokenQuery = c.req.query('key') || c.req.query('secret') || c.req.query('auth_key');
 
-        let providedKey = apiKeyHeader || tokenQuery;
+        let providedKey: string | undefined = apiKeyHeader || undefined;
         if (!providedKey && authHeader) {
             if (authHeader.startsWith('Bearer ')) {
                 providedKey = authHeader.slice(7).trim();
@@ -102,6 +101,7 @@ uploadRoute.post('/api/upload', async (c) => {
                 providedKey = authHeader.trim();
             }
         }
+        // ponytail: ?key= query param removed — leaks in logs/CDN; use header Bearer/X-API-Key only
 
         let fileBuffer: ArrayBuffer | null = null;
         let mimeType: string = 'image/jpeg';
@@ -326,7 +326,7 @@ uploadRoute.post('/api/upload', async (c) => {
 
     } catch (err: any) {
         console.error('Upload route error:', err);
-        return c.json({ success: false, error: err.message || 'Internal Server Error' }, 500);
+        return c.json({ success: false, error: 'Internal Server Error' }, 500);
     }
 });
 

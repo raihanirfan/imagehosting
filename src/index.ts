@@ -55,7 +55,7 @@ app.use('*', async (c, next) => {
     await next();
 });
 
-app.use('*', cors());
+app.use('*', cors({ origin: ['https://imgof.my.id', 'https://www.imgof.my.id'], credentials: true }));
 
 // Canonical domain redirect — only for GET (image views), not for POST upload/delete (ponytail: 301 breaks POST)
 app.use('*', async (c, next) => {
